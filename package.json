@@ -1,5 +1,5 @@
 {
-  "name": "capstone",
+  "name": "@capstone/source",
   "private": true,
   "scripts": {
     "build": "turbo run build",
