@@ -1,5 +1,5 @@
 {
-  "name": "@capstone/worker-signaling-service",
+  "name": "@capstone/worker-messenger",
   "version": "0.0.0",
   "private": true,
   "scripts": {

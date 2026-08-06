@@ -14,7 +14,7 @@ import { DurableObject } from "cloudflare:workers";
  */
 
 /** A Durable Object's behavior is defined in an exported Javascript class */
-export class SignalingServer extends DurableObject<Env> {
+export class Messenger extends DurableObject<Env> {
     sessions: Map<WebSocket, { [key: string]: string }>;
 
     /**
@@ -61,13 +61,13 @@ export class SignalingServer extends DurableObject<Env> {
             `[Durable Object] message: ${message}, from: ${session.id}, to: the initiating client. Total connections: ${this.sessions.size}`
         );
 
-        this.sessions.forEach((attachment, connectedWs) => {
+        this.sessions.forEach((_, connectedWs) => {
             connectedWs.send(
                 `[Durable Object] message: ${message}, from: ${session.id}, to: all clients. Total connections: ${this.sessions.size}`
             );
         });
 
-        this.sessions.forEach((attachment, connectedWs) => {
+        this.sessions.forEach((_, connectedWs) => {
             if (connectedWs !== ws) {
                 connectedWs.send(
                     `[Durable Object] message: ${message}, from: ${session.id}, to: all clients except the initiating client. Total connections: ${this.sessions.size}`
@@ -104,7 +104,7 @@ export default {
                 });
             }
 
-            let stub = env.SIGNALING_SERVICE.getByName("foo");
+            let stub = env.MESSENGER.getByName("foo");
 
             return stub.fetch(request);
         }
