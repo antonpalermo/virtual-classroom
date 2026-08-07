@@ -3,15 +3,22 @@
     "version": "0.0.0",
     "private": "true",
     "type": "module",
-    "exports": {
-        "./*": "./dist/*"
-    },
     "scripts": {
         "dev": "tsc --watch",
         "build": "tsc"
     },
     "devDependencies": {
         "typescript": "^5.9.2"
+    },
+    "exports": {
+        "./status-codes": {
+            "types": "./dist/status-codes.d.ts",
+            "default": "./dist/status-codes.js"
+        },
+        "./status-phrases": {
+            "types": "./dist/status-phrases.d.ts",
+            "default": "./dist/status-phrases.js"
+        }
     },
     "license": "MIT"
 }

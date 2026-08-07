@@ -1,4 +1,4 @@
-import { HTTP_STATUS, HTTP_PHRASES } from "@capstone/web-standards/src";
+import * as HTTP_STATUS from "@capstone/web-standards/status-codes";
 import { DurableObject } from "cloudflare:workers";
 
 /**

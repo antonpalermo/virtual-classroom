@@ -7,15 +7,18 @@
         "incremental": false,
         "isolatedModules": true,
         "lib": ["es2022", "DOM", "DOM.Iterable"],
-        "module": "NodeNext",
+        "module": "es2022",
         "moduleDetection": "force",
-        "moduleResolution": "NodeNext",
+        "moduleResolution": "node",
         "noUncheckedIndexedAccess": true,
         "resolveJsonModule": true,
         "skipLibCheck": true,
         "strict": true,
         "target": "ES2022",
         "strictNullChecks": true,
-        "outDir": "./dist"
-    }
+        "outDir": "dist",
+        "rootDir": "src"
+    },
+    "include": ["src"],
+    "exclude": ["node_modules", "dist"]
 }
