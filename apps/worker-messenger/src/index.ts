@@ -1,3 +1,4 @@
+import { HTTP_STATUS, HTTP_PHRASES } from "@capstone/web-standards/src";
 import { DurableObject } from "cloudflare:workers";
 
 /**
@@ -51,7 +52,7 @@ export class Messenger extends DurableObject<Env> {
 
         this.sessions.set(server, { id });
 
-        return new Response(null, { status: 101, webSocket: client });
+        return new Response(null, { status: HTTP_STATUS.SWITCHING_PROTOCOLS, webSocket: client });
     }
 
     async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
@@ -95,12 +96,12 @@ export default {
         if (request.url.endsWith("/websocket")) {
             const upgradeHeader = request.headers.get("Upgrade");
             if (!upgradeHeader || upgradeHeader !== "websocket") {
-                return new Response("Worker expected upgrade: websocket", { status: 426 });
+                return new Response("Worker expected upgrade: websocket", { status: HTTP_STATUS.UPGRADE_REQUIRED });
             }
 
             if (request.method !== "GET") {
                 return new Response("Worker expected GET method", {
-                    status: 400
+                    status: HTTP_STATUS.BAD_REQUEST
                 });
             }
 
@@ -110,7 +111,7 @@ export default {
         }
 
         return new Response(`Supported endpoints: /websocket: Expects a WebSocket upgrade request`, {
-            status: 200,
+            status: HTTP_STATUS.OK,
             headers: {
                 "Content-Type": "text/plain"
             }
