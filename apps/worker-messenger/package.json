@@ -6,6 +6,7 @@
         "deploy": "wrangler deploy",
         "dev": "wrangler dev",
         "start": "wrangler dev",
+        "lint": "biome check --write",
         "typegen": "wrangler types"
     },
     "devDependencies": {
