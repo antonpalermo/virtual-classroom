@@ -1,0 +1,22 @@
+{
+    "name": "@capstone/standards",
+    "version": "0.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "tsc --watch",
+        "build": "tsc"
+    },
+    "devDependencies": {
+        "@capstone/typescript": "*",
+        "typescript": "^7.0.2"
+    },
+    "exports": {
+        "./status-codes": {
+            "types": "./src/status-codes.ts"
+        },
+        "./status-phrases": {
+            "types": "./src/status-phrases.ts"
+        }
+    },
+    "license": "MIT"
+}

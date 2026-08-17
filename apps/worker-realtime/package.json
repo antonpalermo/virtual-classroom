@@ -8,6 +8,9 @@
         "start": "wrangler dev",
         "typegen": "wrangler types"
     },
+    "dependencies": {
+        "@capstone/standards": "*"
+    },
     "devDependencies": {
         "@capstone/typescript": "*",
         "@types/node": "^26.2.0",

@@ -1,4 +1,6 @@
 import { DurableObject } from 'cloudflare:workers'
+import * as HTTP_STATUS from '@capstone/standards/status-codes'
+import * as HTTP_PHRASES from '@capstone/standards/status-phrases'
 
 export class Messenger extends DurableObject<Env> {
     constructor(ctx: DurableObjectState, env: Env) {
@@ -25,7 +27,7 @@ export class Messenger extends DurableObject<Env> {
             ws.send('new peers has join')
         })
 
-        return new Response(null, { status: 101, webSocket: client })
+        return new Response(null, { status: HTTP_STATUS.SWITCHING_PROTOCOLS, webSocket: client })
     }
 
     async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
@@ -50,11 +52,11 @@ export default {
 
         if (url.pathname === '/messenger') {
             if (!upgradeHeader || upgradeHeader !== 'websocket') {
-                return new Response('worker expected upgrade header to contain websocket', { status: 426 })
+                return new Response(HTTP_PHRASES.UPGRADE_REQUIRED, { status: HTTP_STATUS.UPGRADE_REQUIRED })
             }
 
             if (request.method !== 'GET' || !room) {
-                return new Response('worker failed to process your request', { status: 400 })
+                return new Response(HTTP_PHRASES.BAD_REQUEST, { status: HTTP_STATUS.BAD_REQUEST })
             }
 
             const id = env.MESSENGER.idFromName(room)
@@ -63,6 +65,6 @@ export default {
             return stub.fetch(request)
         }
 
-        return new Response('invalid request please try again later', { status: 200, headers: { 'Content-Type': 'text/plain' } })
+        return new Response('invalid request please try again later', { status: HTTP_STATUS.OK, headers: { 'Content-Type': 'text/plain' } })
     }
 } satisfies ExportedHandler<Env>
