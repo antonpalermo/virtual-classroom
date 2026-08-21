@@ -42,8 +42,6 @@ yarn-error.log*
 logs
 _.log
 npm-debug.log_
-yarn-debug.log*
-yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
@@ -63,8 +61,6 @@ _.seed
 lib-cov
 
 # Coverage directory used by tools like istanbul
-
-coverage
 \*.lcov
 
 # nyc test coverage
@@ -144,7 +140,6 @@ out
 # Nuxt.js build / generate output
 
 .nuxt
-dist
 
 # Gatsby files
 
@@ -163,7 +158,6 @@ dist
 # vuepress v2.x temp and cache directory
 
 .temp
-.cache
 
 # Docusaurus cache and generated files
 
@@ -205,3 +199,5 @@ dist
 !.env.example
 .wrangler/
 
+# Tanstack Router
+.tanstack

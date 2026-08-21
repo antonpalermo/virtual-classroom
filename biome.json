@@ -7,7 +7,7 @@
     },
     "files": {
         "ignoreUnknown": false,
-        "includes": ["**", "!**/node_modules", "!**/worker-configuration.d.ts", "!**/.wrangler"]
+        "includes": ["**", "!**/node_modules", "!**/worker-configuration.d.ts", "!**/.wrangler", "!**/routeTree.gen.ts"]
     },
     "formatter": {
         "enabled": true,
@@ -21,14 +21,14 @@
         "bracketSpacing": true,
         "expand": "auto",
         "useEditorconfig": true,
-        "includes": ["**", "!**/node_modules", "!**/worker-configuration.d.ts", "!**/.wrangler"]
+        "includes": ["**", "!**/node_modules", "!**/worker-configuration.d.ts", "!**/.wrangler", "!**/routeTree.gen.ts"]
     },
     "linter": {
         "enabled": true,
         "rules": {
             "preset": "recommended"
         },
-        "includes": ["**", "!**/node_modules", "!**/worker-configuration.d.ts", "!**/.wrangler"]
+        "includes": ["**", "!**/node_modules", "!**/worker-configuration.d.ts", "!**/.wrangler", "!**/routeTree.gen.ts"]
     },
     "javascript": {
         "formatter": {
