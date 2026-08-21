@@ -5,6 +5,7 @@
         "build": "turbo run build",
         "dev": "turbo run dev",
         "lint": "turbo run lint",
+        "typegen": "turbo run typegen",
         "format": "biome format --write",
         "check-types": "turbo run check-types",
         "prepare": "husky"
@@ -29,5 +30,9 @@
             "version": "11.16.0"
         }
     },
-    "workspaces": ["apps/*", "packages/*"]
+    "workspaces": ["apps/*", "packages/*"],
+    "allowScripts": {
+        "esbuild@0.28.1": true,
+        "workerd@1.20260811.1": true
+    }
 }
