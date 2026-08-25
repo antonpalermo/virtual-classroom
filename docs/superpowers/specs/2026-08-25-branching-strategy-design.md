@@ -55,7 +55,7 @@ No ticket-ID prefix — there's no issue tracker in use yet. If one gets adopted
 
 ### Documentation
 
-Add a `## Branching` section to the root `CLAUDE.md`, near the existing `## Commit` section — `CLAUDE.md` already serves as the cross-cutting/monorepo-map document, and this is exactly that kind of concern.
+Add a `## Branching` section to the root `CLAUDE.md`, appended after its last existing section (`CLAUDE.md` has no `## Commit` section at time of writing) — `CLAUDE.md` already serves as the cross-cutting/monorepo-map document, and this is exactly that kind of concern.
 
 ## Explicitly deferred (revisit later, not now)
 
