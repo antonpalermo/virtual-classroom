@@ -1,0 +1,32 @@
+{
+    "name": "@capstone/auth",
+    "version": "0.0.0",
+    "private": true,
+    "scripts": {
+        "deploy": "wrangler deploy",
+        "dev": "wrangler dev",
+        "start": "wrangler dev",
+        "typegen": "wrangler types",
+        "lint": "biome check .",
+        "test": "vitest",
+        "test:run": "vitest run"
+    },
+    "dependencies": {
+        "@better-auth/oauth-provider": "^1.7.1",
+        "better-auth": "^1.7.1",
+        "drizzle-orm": "^0.45.2",
+        "hono": "^4.13.5"
+    },
+    "devDependencies": {
+        "@capstone/typescript": "*",
+        "@cloudflare/vitest-pool-workers": "^0.22.0",
+        "@cloudflare/workers-types": "^5.20260826.1",
+        "@msw/cloudflare": "^0.0.1",
+        "@types/node": "^24.13.3",
+        "drizzle-kit": "^0.31.10",
+        "msw": "^2.15.0",
+        "typescript": "^7.0.2",
+        "vitest": "^4.1.11",
+        "wrangler": "^4.126.0"
+    }
+}

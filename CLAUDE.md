@@ -6,14 +6,15 @@ Each workspace has its own `CLAUDE.md` with details specific to it — read that
 
 ## Project overview
 
-A virtual classroom / video conferencing app built entirely on Cloudflare Workers. It's an early-stage Turborepo monorepo (npm workspaces) with two deployable apps and two shared packages:
+A virtual classroom / video conferencing app built entirely on Cloudflare Workers. It's an early-stage Turborepo monorepo (npm workspaces) with three deployable apps and two shared packages:
 
 - `apps/worker-client` (`@capstone/client`) — the frontend. See [apps/worker-client/CLAUDE.md](apps/worker-client/CLAUDE.md).
 - `apps/worker-realtime` (`@capstone/realtime`) — the realtime signaling backend (`Messenger` Durable Object). See [apps/worker-realtime/CLAUDE.md](apps/worker-realtime/CLAUDE.md).
+- `apps/worker-auth` (`@capstone/auth`) — the identity worker: Google sign-in/sign-up and the OAuth provider other apps will link against. See [apps/worker-auth/CLAUDE.md](apps/worker-auth/CLAUDE.md).
 - `packages/web-standards` (`@capstone/standards`) — generated HTTP status code/phrase constants. See [packages/web-standards/CLAUDE.md](packages/web-standards/CLAUDE.md).
 - `packages/config-typescript` (`@capstone/typescript`) — shared base `tsconfig` files. See [packages/config-typescript/CLAUDE.md](packages/config-typescript/CLAUDE.md).
 
-The two apps are independent Cloudflare Workers deployed separately (no service bindings between them yet) — the client currently has no code that talks to the realtime worker.
+The three apps are independent Cloudflare Workers deployed separately (no service bindings between them yet) — the client currently has no code that talks to the realtime or auth workers.
 
 ## Generated files — never Read in full
 
@@ -40,7 +41,7 @@ npm run format            # biome format --write (root only, not turbo-orchestra
 
 Scope any of the turbo-backed scripts to one workspace with `--filter`, e.g. `turbo run dev --filter=@capstone/client` or `turbo run build --filter=@capstone/realtime`. Per-app commands are documented in each workspace's own `CLAUDE.md`.
 
-There is no test runner configured in this repo yet.
+There is no repo-wide test runner configured in `turbo.json` yet. Individual workspaces have their own test suites — for example, `apps/worker-auth` runs Vitest (see [apps/worker-auth/CLAUDE.md](apps/worker-auth/CLAUDE.md)'s Testing section).
 
 Formatting/linting is done entirely by **Biome** (`biome.json`, 4-space indent, single quotes, no semicolons, no trailing commas, 140 col width) for the whole repo, including React-specific rules (hooks, refresh) in `apps/worker-client` via the `react` linter domain — there is no ESLint in this repo. `npm run lint` runs `biome check .` per workspace via Turborepo. Biome also runs via `lint-staged` on every commit through Husky (`.husky/pre-commit` → `npx lint-staged`), which runs `biome check --write` on all staged files — don't hand-format code in a style Biome would rewrite.
 
