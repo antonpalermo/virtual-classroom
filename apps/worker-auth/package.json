@@ -12,6 +12,9 @@
         "test:run": "vitest run"
     },
     "dependencies": {
+        "@better-auth/oauth-provider": "^1.7.1",
+        "better-auth": "^1.7.1",
+        "drizzle-orm": "^0.45.2",
         "hono": "^4.13.5"
     },
     "devDependencies": {
@@ -19,6 +22,7 @@
         "@cloudflare/vitest-pool-workers": "^0.22.0",
         "@cloudflare/workers-types": "^5.20260826.1",
         "@types/node": "^24.13.3",
+        "drizzle-kit": "^0.31.10",
         "typescript": "^7.0.2",
         "vitest": "^4.1.11",
         "wrangler": "^4.126.0"
