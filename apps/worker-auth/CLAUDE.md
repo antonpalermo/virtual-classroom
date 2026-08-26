@@ -15,13 +15,13 @@
 ## Regenerating the schema after a config change
 
 ```bash
-npx auth@latest generate --config ./auth.cli.ts --adapter drizzle --dialect sqlite --output src/db/schema.ts
+npx auth@latest generate --config ./auth.cli.ts --adapter drizzle --dialect sqlite --output src/db/schema.ts -y
 npx drizzle-kit generate
 ```
 
 ## Testing
 
-`@cloudflare/vitest-pool-workers` runs tests inside the real Workers runtime against a real local D1 (migrations applied automatically via `test/apply-migrations.ts`). Outbound calls to Google are mocked with `@msw/cloudflare` (`test/helpers/google-network.ts`) so the full sign-in/callback path runs deterministically without a real Google account. Run: `npm test` (watch) or `npm run test:run` (single run).
+`@cloudflare/vitest-pool-workers` runs tests inside the real Workers runtime against a real local D1 (migrations applied automatically via `test/apply-migrations.ts`). Tests call the app via `test/helpers/call-app.ts` (`callAsApp`). Outbound calls to Google are mocked with `@msw/cloudflare` (`test/helpers/google-network.ts`) so the full sign-in/callback path runs deterministically without a real Google account. Run: `npm test` (watch) or `npm run test:run` (single run).
 
 One thing the automated suite can't cover: an actual round trip through Google's real consent screen. That's a manual, one-time check via `wrangler dev` with a real Google Cloud OAuth client — see the auth worker design spec's Testing section.
 

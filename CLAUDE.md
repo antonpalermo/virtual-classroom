@@ -41,7 +41,7 @@ npm run format            # biome format --write (root only, not turbo-orchestra
 
 Scope any of the turbo-backed scripts to one workspace with `--filter`, e.g. `turbo run dev --filter=@capstone/client` or `turbo run build --filter=@capstone/realtime`. Per-app commands are documented in each workspace's own `CLAUDE.md`.
 
-There is no test runner configured in this repo yet.
+There is no repo-wide test runner configured in `turbo.json` yet. Individual workspaces have their own test suites — for example, `apps/worker-auth` runs Vitest (see [apps/worker-auth/CLAUDE.md](apps/worker-auth/CLAUDE.md)'s Testing section).
 
 Formatting/linting is done entirely by **Biome** (`biome.json`, 4-space indent, single quotes, no semicolons, no trailing commas, 140 col width) for the whole repo, including React-specific rules (hooks, refresh) in `apps/worker-client` via the `react` linter domain — there is no ESLint in this repo. `npm run lint` runs `biome check .` per workspace via Turborepo. Biome also runs via `lint-staged` on every commit through Husky (`.husky/pre-commit` → `npx lint-staged`), which runs `biome check --write` on all staged files — don't hand-format code in a style Biome would rewrite.
 
