@@ -26,7 +26,18 @@
     "linter": {
         "enabled": true,
         "rules": {
-            "preset": "recommended"
+            "preset": "recommended",
+            "style": {
+                "useComponentExportOnlyModules": {
+                    "level": "warn",
+                    "options": {
+                        "allowConstantExport": true
+                    }
+                }
+            }
+        },
+        "domains": {
+            "react": "recommended"
         },
         "includes": ["**", "!**/node_modules", "!**/worker-configuration.d.ts", "!**/.wrangler", "!**/routeTree.gen.ts"]
     },

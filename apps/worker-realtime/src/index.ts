@@ -45,7 +45,7 @@ export class Messenger extends DurableObject<Env> {
 }
 
 export default {
-    async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
         const url = new URL(request.url)
         const room = url.searchParams.get('room')
         const upgradeHeader = request.headers.get('Upgrade')

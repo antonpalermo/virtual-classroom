@@ -17,7 +17,7 @@ No code here talks to `worker-realtime` yet — the two workers deploy independe
 
 - `dev` — vite
 - `build` — `tsc -b && vite build`
-- `lint` — eslint
+- `lint` — `biome check .`
 - `preview` — `npm run build && vite preview`
 - `deploy` — `npm run build && wrangler deploy`
 - `cf-typegen` — `wrangler types` (regenerates `worker-configuration.d.ts`)
@@ -29,4 +29,4 @@ No code here talks to `worker-realtime` yet — the two workers deploy independe
 - `tsconfig.node.json` — Vite config
 - `tsconfig.worker.json` — the passthrough worker under `worker/`; extends `tsconfig.node.json` and types against `worker-configuration.d.ts`
 
-ESLint (React-specific rules: hooks, refresh) is scoped to this app via its own `eslint.config.js`; Biome (repo root config) handles general formatting/linting.
+Biome (repo root config) handles formatting and linting, including React-specific rules (hooks, refresh) via the `react` linter domain — there is no separate ESLint config.

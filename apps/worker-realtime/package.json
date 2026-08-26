@@ -6,7 +6,8 @@
         "deploy": "wrangler deploy",
         "dev": "wrangler dev",
         "start": "wrangler dev",
-        "typegen": "wrangler types"
+        "typegen": "wrangler types",
+        "lint": "biome check ."
     },
     "dependencies": {
         "@capstone/standards": "*"

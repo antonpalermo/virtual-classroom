@@ -42,7 +42,7 @@ Scope any of the turbo-backed scripts to one workspace with `--filter`, e.g. `tu
 
 There is no test runner configured in this repo yet.
 
-Formatting/linting is done by **Biome** (`biome.json`, 4-space indent, single quotes, no semicolons, no trailing commas, 140 col width) for the whole repo, plus a separate ESLint config scoped to `apps/worker-client` for React-specific rules (hooks, refresh). Biome runs via `lint-staged` on every commit through Husky (`.husky/pre-commit` → `npx lint-staged`), which runs `biome check --write` on all staged files — don't hand-format code in a style Biome would rewrite.
+Formatting/linting is done entirely by **Biome** (`biome.json`, 4-space indent, single quotes, no semicolons, no trailing commas, 140 col width) for the whole repo, including React-specific rules (hooks, refresh) in `apps/worker-client` via the `react` linter domain — there is no ESLint in this repo. `npm run lint` runs `biome check .` per workspace via Turborepo. Biome also runs via `lint-staged` on every commit through Husky (`.husky/pre-commit` → `npx lint-staged`), which runs `biome check --write` on all staged files — don't hand-format code in a style Biome would rewrite.
 
 ## TypeScript config layout
 
