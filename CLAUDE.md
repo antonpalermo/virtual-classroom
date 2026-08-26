@@ -6,14 +6,15 @@ Each workspace has its own `CLAUDE.md` with details specific to it — read that
 
 ## Project overview
 
-A virtual classroom / video conferencing app built entirely on Cloudflare Workers. It's an early-stage Turborepo monorepo (npm workspaces) with two deployable apps and two shared packages:
+A virtual classroom / video conferencing app built entirely on Cloudflare Workers. It's an early-stage Turborepo monorepo (npm workspaces) with three deployable apps and two shared packages:
 
 - `apps/worker-client` (`@capstone/client`) — the frontend. See [apps/worker-client/CLAUDE.md](apps/worker-client/CLAUDE.md).
 - `apps/worker-realtime` (`@capstone/realtime`) — the realtime signaling backend (`Messenger` Durable Object). See [apps/worker-realtime/CLAUDE.md](apps/worker-realtime/CLAUDE.md).
+- `apps/worker-auth` (`@capstone/auth`) — the identity worker: Google sign-in/sign-up and the OAuth provider other apps will link against. See [apps/worker-auth/CLAUDE.md](apps/worker-auth/CLAUDE.md).
 - `packages/web-standards` (`@capstone/standards`) — generated HTTP status code/phrase constants. See [packages/web-standards/CLAUDE.md](packages/web-standards/CLAUDE.md).
 - `packages/config-typescript` (`@capstone/typescript`) — shared base `tsconfig` files. See [packages/config-typescript/CLAUDE.md](packages/config-typescript/CLAUDE.md).
 
-The two apps are independent Cloudflare Workers deployed separately (no service bindings between them yet) — the client currently has no code that talks to the realtime worker.
+The three apps are independent Cloudflare Workers deployed separately (no service bindings between them yet) — the client currently has no code that talks to the realtime or auth workers.
 
 ## Generated files — never Read in full
 
