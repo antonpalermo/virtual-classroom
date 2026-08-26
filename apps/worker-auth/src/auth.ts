@@ -1,5 +1,7 @@
+import { oauthProvider } from '@better-auth/oauth-provider'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { jwt } from 'better-auth/plugins'
 import type { Db } from './db/client'
 
 export function createAuth(db: Db, env: Env) {
@@ -24,6 +26,13 @@ export function createAuth(db: Db, env: Env) {
             }
         },
         // 'https://example.com' matches the origin the test suite's synthetic requests use.
-        trustedOrigins: [env.BETTER_AUTH_URL, 'https://example.com']
+        trustedOrigins: [env.BETTER_AUTH_URL, 'https://example.com'],
+        plugins: [
+            jwt(),
+            oauthProvider({
+                loginPage: '/sign-in',
+                consentPage: '/consent'
+            })
+        ]
     })
 }
