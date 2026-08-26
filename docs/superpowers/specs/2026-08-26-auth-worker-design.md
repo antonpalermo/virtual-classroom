@@ -19,10 +19,10 @@ This repo already has Better Auth-focused skills staged (`better-auth-best-pract
 ## Non-goals (explicitly deferred)
 
 - **Wiring up `worker-client` or `worker-realtime` as consumers.** This spec produces a standalone, working auth worker. Integrating an existing app as the first "linked application" is a separate follow-up spec.
-- **Roles/permissions design.** The user table gets one placeholder `role` field (see Data model) so the shape exists, but the actual roles/permissions model (global vs. per-application, admin UI, etc.) is deliberately deferred to a later design pass.
+- **Roles/permissions design.** The user table gets one placeholder `role` field (see Data model) so the shape exists, but the actual roles/permissions model (global vs. per-application, admin UI, etc.) is deliberately deferred to a later design pass. No admin UI for managing users, roles, or registered OAuth client applications either.
 - **Custom domain.** No custom domain is configured for Cloudflare Workers yet. This design targets the worker's `workers.dev` URL. Moving to a custom domain later is a low-risk follow-up (update `baseURL`/`trustedOrigins` env config and the Google Cloud OAuth client's redirect URI).
-- **Additional identity providers beyond Google** (email/password, GitHub, 2FA, etc.) — deliberately out of scope for this pass, but the design must not preclude adding them later.
-- **A real second linked application.** Proven via a dummy OAuth client registered through Better Auth's own client-registration endpoint (see Testing), not a real second app.
+- **Additional identity providers beyond Google** (email/password, GitHub, Microsoft, 2FA, etc.) — deliberately out of scope for this pass, but the design must not preclude adding them later.
+- **A real second linked application.** Proven via a dummy OAuth client registered through Better Auth's own client-registration flow (see Testing), not a real second app.
 
 ## Architecture
 
@@ -31,7 +31,7 @@ A new Worker, `apps/worker-auth`, structured like the existing `apps/worker-real
 - **Routing:** Hono, mounting Better Auth's request handler at `/api/auth/*` (Better Auth's standard convention). Hono is used only as the thin routing layer around Better Auth's handler — no other framework machinery needed.
 - **Auth engine:** Better Auth, configured with:
   - `socialProviders.google` — the only configured identity provider today.
-  - The `oidcProvider` plugin — makes this worker itself an OAuth2/OIDC issuer. Future applications register as OAuth clients (via Better Auth's client-registration flow) and redirect users to this worker's `/api/auth/oauth2/authorize` endpoint to sign in, receiving back an authorization code they exchange for tokens/user info — the same shape as any third-party "Sign in with X" integration, except this worker is the X.
+  - The `oidcProvider` plugin — makes this worker itself an OAuth2/OIDC issuer. Future applications register as OAuth clients (via Better Auth's client-registration flow) and redirect users to this worker's `/api/auth/oauth2/authorize` endpoint to sign in, receiving back an authorization code they exchange for tokens/user info — the same shape as any third-party "Sign in with X" integration, except this worker is the X. Registering a client is an authenticated action tied to a signed-in user account, not an open/anonymous endpoint. Exact route names (`/api/auth/oauth2/*`, and the client-registration route) should be confirmed against the installed Better Auth version's docs/source at implementation time — the plugin's route surface has changed across versions.
 - **Database:** Cloudflare D1, bound as `AUTH_DB`. Schema and queries via Drizzle (`drizzle-orm/d1`), using Better Auth's `drizzleAdapter`. Schema lives at `apps/worker-auth/src/db/schema.ts`, generated once via `npx @better-auth/cli generate` against the Better Auth config (core tables + `oidcProvider` plugin tables) and owned/hand-edited from there — same pattern as `worker-realtime` owning its own DO storage.
 - **Sessions:** Better Auth's default DB-backed session with a secure, httpOnly cookie. No custom session/token logic.
 - **Secrets:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (from a Google Cloud OAuth client the user creates manually — outside repo scope), and `BETTER_AUTH_SECRET` (session/token signing). Set via `wrangler secret put` in each environment; local dev values in `.dev.vars` (gitignored, matching standard Workers convention).
@@ -65,11 +65,4 @@ No test runner is configured in this repo yet, so verification is manual:
 3. **Google sign-in (existing user):** repeat step 2 with the same Google account. Confirm the same `user` row is reused (no duplicate) and a new `session` row is created.
 4. `GET /api/auth/get-session` with the session cookie returns the signed-in user, including the placeholder `role` field.
 5. Sign-out clears the session (subsequent `get-session` call returns unauthenticated).
-6. **OIDC provider end-to-end:** register one dummy OAuth client via Better Auth's client-registration endpoint, then drive the full authorization-code flow with curl: `/api/auth/oauth2/authorize` → consent → authorization code → `/api/auth/oauth2/token` exchange → resulting access token resolves to the correct user (e.g. via a userinfo-equivalent endpoint). This proves the "link a new application" capability actually works end-to-end, not just that the plugin is configured.
-
-## Explicitly deferred (revisit later, not now)
-
-- Roles/permissions model (global vs. per-application), and any admin UI for managing users, roles, or registered OAuth client applications.
-- Wiring `worker-client` / `worker-realtime` up as consumers of this auth worker.
-- Additional identity providers (email/password, GitHub, Microsoft, 2FA).
-- Custom domain migration.
+6. **OIDC provider end-to-end:** using the still-authenticated session from step 2/3 (client registration requires a signed-in user), register one dummy OAuth client via Better Auth's client-registration flow, then drive the full authorization-code flow with curl: `/api/auth/oauth2/authorize` → consent → authorization code → `/api/auth/oauth2/token` exchange → resulting access token resolves to the correct user (e.g. via a userinfo-equivalent endpoint). This proves the "link a new application" capability actually works end-to-end, not just that the plugin is configured.
