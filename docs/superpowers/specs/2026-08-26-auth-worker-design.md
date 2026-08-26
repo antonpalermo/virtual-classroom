@@ -12,7 +12,7 @@ This repo already has Better Auth-focused skills staged (`better-auth-best-pract
 
 - A new Cloudflare Worker, `apps/worker-auth` (`@capstone/auth`), that owns all user/session/credential data.
 - Google sign-in and sign-up working end-to-end, using Better Auth's built-in social provider support.
-- The worker acts as its own OAuth2/OIDC **provider** (not just a consumer of Google) via Better Auth's `oidcProvider` plugin, so that future applications can "link" to it the same way you'd add "Sign in with Google" — except the provider is this worker. Linked apps redirect users here to sign in and get back a token plus user info, rather than talking to the database directly.
+- The worker acts as its own OAuth 2.1 **provider** (not just a consumer of Google) via Better Auth's `oauthProvider` plugin (package `@better-auth/oauth-provider`, used together with the `jwt` plugin it depends on), so that future applications can "link" to it the same way you'd add "Sign in with Google" — except the provider is this worker. Linked apps redirect users here to sign in and get back a token plus user info, rather than talking to the database directly.
 - Extensible to more identity providers later (GitHub, Microsoft, email/password, 2FA, etc.) as pure configuration additions, no architectural change.
 - D1 as the datastore, with Drizzle as the schema/query layer (project preference over Better Auth's default Kysely adapter), living entirely inside `apps/worker-auth` — not a shared package, since no other workspace should ever touch this database directly.
 
@@ -31,11 +31,12 @@ A new Worker, `apps/worker-auth`, structured like the existing `apps/worker-real
 - **Routing:** Hono, mounting Better Auth's request handler at `/api/auth/*` (Better Auth's standard convention). Hono is used only as the thin routing layer around Better Auth's handler — no other framework machinery needed.
 - **Auth engine:** Better Auth, configured with:
   - `socialProviders.google` — the only configured identity provider today.
-  - The `oidcProvider` plugin — makes this worker itself an OAuth2/OIDC issuer. Future applications register as OAuth clients (via Better Auth's client-registration flow) and redirect users to this worker's `/api/auth/oauth2/authorize` endpoint to sign in, receiving back an authorization code they exchange for tokens/user info — the same shape as any third-party "Sign in with X" integration, except this worker is the X. Registering a client is an authenticated action tied to a signed-in user account, not an open/anonymous endpoint. Exact route names (`/api/auth/oauth2/*`, and the client-registration route) should be confirmed against the installed Better Auth version's docs/source at implementation time — the plugin's route surface has changed across versions.
-- **Database:** Cloudflare D1, bound as `AUTH_DB`. Schema and queries via Drizzle (`drizzle-orm/d1`), using Better Auth's `drizzleAdapter`. Schema lives at `apps/worker-auth/src/db/schema.ts`, generated once via `npx @better-auth/cli generate` against the Better Auth config (core tables + `oidcProvider` plugin tables) and owned/hand-edited from there — same pattern as `worker-realtime` owning its own DO storage.
+  - The `oauthProvider` plugin (`@better-auth/oauth-provider`, requires `jwt` from `better-auth/plugins` alongside it) — makes this worker itself an OAuth 2.1 issuer. Future applications register as OAuth clients — via `auth.api.createOAuthClient` (authenticated, called with a signed-in user's session headers) or, once enabled, dynamic client registration at `/oauth2/register` — and redirect users to this worker's authorize endpoint to sign in, receiving back an authorization code they exchange for tokens/user info. Routes live under Better Auth's basePath (default `/api/auth`), e.g. `/api/auth/oauth2/authorize`, `/api/auth/oauth2/token` — confirm the exact mounted paths against the running worker's `/api/auth/reference` (if the `openAPI` plugin is added) or the plugin's source at implementation time. The plugin exposes `loginPage`/`consentPage` config paths that unauthenticated/non-trusted-client requests get redirected to; since this spec has no UI (see below), those configured paths are placeholders that are never expected to be hit in this pass — every flow this spec exercises uses an already-authenticated session and a client marked `skip_consent: true`.
+- **Database:** Cloudflare D1, bound as `AUTH_DB`. Schema and queries via Drizzle (`drizzle-orm/d1`), using Better Auth's `drizzleAdapter(db, { provider: "sqlite" })`. Schema lives at `apps/worker-auth/src/db/schema.ts`, generated via `npx auth@latest generate --adapter drizzle --dialect sqlite --output src/db/schema.ts` against the Better Auth config (core tables + `oauthProvider`/`jwt` plugin tables) and owned/hand-edited from there — same pattern as `worker-realtime` owning its own DO storage.
 - **Sessions:** Better Auth's default DB-backed session with a secure, httpOnly cookie. No custom session/token logic.
 - **Secrets:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (from a Google Cloud OAuth client the user creates manually — outside repo scope), and `BETTER_AUTH_SECRET` (session/token signing). Set via `wrangler secret put` in each environment; local dev values in `.dev.vars` (gitignored, matching standard Workers convention).
-- **No verification UI.** No page is served for manual sign-in testing — verification is done by hitting `/api/auth/*` endpoints directly (curl, and a real browser only where Google's own consent screen requires it — see Testing).
+- **Compatibility flag:** `nodejs_compat` must be added to `wrangler.jsonc` — Better Auth relies on `AsyncLocalStorage`, which Workers only expose under this flag.
+- **No verification UI.** No page is served for manual sign-in testing — verification is primarily automated (see Testing), with one manual real-browser check against an actual Google account since that leg can't be automated.
 
 ## Data model
 
@@ -43,11 +44,11 @@ All tables live in the single `AUTH_DB` D1 database, owned exclusively by this w
 
 - **Better Auth core tables:** `user`, `session`, `account` (one row per linked identity provider per user — starts with just Google), `verification`.
 - **`user.role`** — a single `text` column, default `'user'`. Placeholder only; no enforcement or admin UI yet. Deferred per Non-goals.
-- **`oidcProvider` plugin tables:** registered OAuth client applications, issued access/refresh tokens, and consent records — these are what make "linking a new application" concrete: a new app becomes a row in the client-applications table with a `client_id`/`client_secret`/redirect URI, not a code change in this worker.
+- **`oauthProvider`/`jwt` plugin tables:** registered OAuth client applications, issued access/refresh tokens, and consent records (exact table names are whatever `npx auth@latest generate` produces for these plugins) — these are what make "linking a new application" concrete: a new app becomes a row in the client-applications table with a `client_id`/`client_secret`/redirect URI, not a code change in this worker.
 
 ## CORS / trusted origins
 
-Better Auth requires a `baseURL` (this worker's own `workers.dev` URL) and a `trustedOrigins` list, used to validate redirect URIs on the OAuth authorization endpoint. Today `trustedOrigins` contains only the worker's own origin plus `localhost` (for local dev) — there are no linked apps yet. Each future linked application adds its own redirect URI when it registers as an OAuth client via the `oidcProvider` plugin's client-registration flow; `trustedOrigins` is not meant to be hand-edited per app going forward.
+Better Auth requires a `baseURL` (this worker's own `workers.dev` URL) and a `trustedOrigins` list, used to validate redirect URIs on the OAuth authorization endpoint. Today `trustedOrigins` contains only the worker's own origin plus `localhost` (for local dev) — there are no linked apps yet. Each future linked application adds its own redirect URI when it registers as an OAuth client via the `oauthProvider` plugin's client-registration flow; `trustedOrigins` is not meant to be hand-edited per app going forward.
 
 ## Migrations & deployment
 
@@ -58,11 +59,18 @@ Better Auth requires a `baseURL` (this worker's own `workers.dev` URL) and a `tr
 
 ## Testing / verification
 
-No test runner is configured in this repo yet, so verification is manual:
+No test runner is configured in this repo yet — adding one (Vitest with `@cloudflare/vitest-pool-workers`, the same tool the `durable-objects` skill recommends) is part of this work. Verification is TDD throughout: every behavior below is a failing automated test written before the code that makes it pass, run via `SELF.fetch(...)` against the real worker inside the Workers runtime (Miniflare), backed by a real local D1 instance.
 
-1. `wrangler d1 migrations apply AUTH_DB` (local) succeeds; `wrangler dev` boots without error.
-2. **Google sign-up:** in a real browser (required — Google's consent screen can't be curled), follow `/api/auth/sign-in/social?provider=google`, complete consent, land on the callback. Confirm a new `user` row and `session` row exist in local D1, and a session cookie is set.
-3. **Google sign-in (existing user):** repeat step 2 with the same Google account. Confirm the same `user` row is reused (no duplicate) and a new `session` row is created.
-4. `GET /api/auth/get-session` with the session cookie returns the signed-in user, including the placeholder `role` field.
-5. Sign-out clears the session (subsequent `get-session` call returns unauthenticated).
-6. **OIDC provider end-to-end:** using the still-authenticated session from step 2/3 (client registration requires a signed-in user), register one dummy OAuth client via Better Auth's client-registration flow, then drive the full authorization-code flow with curl: `/api/auth/oauth2/authorize` → consent → authorization code → `/api/auth/oauth2/token` exchange → resulting access token resolves to the correct user (e.g. via a userinfo-equivalent endpoint). This proves the "link a new application" capability actually works end-to-end, not just that the plugin is configured.
+The one leg that can't be automated is an actual round trip through Google's own consent screen — that stays a manual, one-time developer check. Everything else, including the Google sign-in/sign-up *callback handling*, is automated by mocking Google's OAuth endpoints (token exchange, userinfo) with `cloudflare:test`'s `fetchMock`, which intercepts outbound `fetch()` calls the worker makes during the test run. This lets the full sign-up/callback/session-creation code path run deterministically in CI without a real Google account.
+
+**Automated (Vitest, TDD):**
+1. `GET /api/auth/ok` returns `{ status: "ok" }` — proves the worker boots, D1 migrations applied, and Better Auth is mounted.
+2. `GET /api/auth/sign-in/social?provider=google` returns a redirect to Google's authorization endpoint with the expected `client_id`, `redirect_uri`, and `scope` — no real Google call needed for this leg.
+3. **Google sign-up:** with `fetchMock` stubbing Google's token and userinfo endpoints to return a fixed fake profile, hitting the callback URL (as Google would after consent) creates a new `user` row, a matching `account` row, a `session` row, and sets a session cookie.
+4. **Google sign-in (existing user):** repeating step 3 with the same fake profile reuses the same `user` row (no duplicate) and creates a new `session` row.
+5. `GET /api/auth/get-session` with the session cookie returns the signed-in user, including the placeholder `role` field (default `'user'`).
+6. Sign-out clears the session (a subsequent `get-session` call returns unauthenticated).
+7. **OAuth provider end-to-end:** using the still-authenticated session from step 3/4, call `auth.api.createOAuthClient` (or the admin variant) to register one dummy OAuth client with `skip_consent: true`, then drive the full authorization-code flow via `SELF.fetch`: authorize → authorization code → token exchange → the resulting access token resolves to the correct user. This proves the "link a new application" capability actually works end-to-end, not just that the plugin is configured.
+
+**Manual, one-time (real Google account, real browser):**
+8. `wrangler dev` locally, follow `/api/auth/sign-in/social?provider=google` in an actual browser, complete Google's real consent screen, confirm the callback succeeds and a real session is created — a sanity check that the mocked test suite above matches Google's real behavior.
