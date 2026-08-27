@@ -8,13 +8,16 @@
         "typegen": "turbo run typegen",
         "format": "biome format --write",
         "check-types": "turbo run check-types",
-        "prepare": "husky"
+        "prepare": "husky",
+        "changeset": "changeset",
+        "version-packages": "changeset version"
     },
     "lint-staged": {
         "*": ["biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"]
     },
     "devDependencies": {
         "@biomejs/biome": "2.5.8",
+        "@changesets/cli": "^3.0.1",
         "husky": "^9.1.7",
         "lint-staged": "^17.3.0",
         "prettier": "^3.7.4",
