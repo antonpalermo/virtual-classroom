@@ -23,7 +23,7 @@ npx drizzle-kit generate
 
 `@cloudflare/vitest-pool-workers` runs tests inside the real Workers runtime against a real local D1 (migrations applied automatically via `test/apply-migrations.ts`). Tests call the app via `test/helpers/call-app.ts` (`callAsApp`). Outbound calls to Google are mocked with `@msw/cloudflare` (`test/helpers/google-network.ts`) so the full sign-in/callback path runs deterministically without a real Google account. Run: `npm test` (watch) or `npm run test:run` (single run).
 
-One thing the automated suite can't cover: an actual round trip through Google's real consent screen. That's a manual, one-time check via `wrangler dev` with a real Google Cloud OAuth client — see the auth worker design spec's Testing section.
+One thing the automated suite can't cover: an actual round trip through Google's real consent screen. That's a manual, one-time check via `wrangler dev` with a real Google Cloud OAuth client — see the auth worker design spec's Testing section. Note that in local dev, `.dev.vars`' `BETTER_AUTH_URL` is set to `worker-client`'s origin (`http://localhost:5173`), not this worker's own — Better Auth derives both the Google `redirect_uri` and the session cookie's scope from `baseURL`, and requests only reach this worker proxied through `worker-client`'s service binding, so `worker-client`'s dev server needs to be running too for this manual check to work.
 
 ## Commands (run from this directory, or via `npm run <script> -w @capstone/auth` from root)
 
@@ -32,4 +32,6 @@ One thing the automated suite can't cover: an actual round trip through Google's
 - `typegen` — `wrangler types` (regenerates `worker-configuration.d.ts`)
 - `test` / `test:run` — Vitest
 
-No code here talks to `worker-client` or `worker-realtime` yet — this worker deploys independently. See the [auth worker design spec](../../docs/superpowers/specs/2026-08-26-auth-worker-design.md) for what's deliberately deferred (roles/permissions design, wiring up consumers, additional identity providers, custom domain).
+`worker-client` talks to this worker via a Cloudflare service binding (`AUTH_SERVICE` in `apps/worker-client/wrangler.jsonc`), proxying `/api/auth/*` requests through — see [docs/superpowers/specs/2026-08-27-client-auth-wiring-design.md](../../docs/superpowers/specs/2026-08-27-client-auth-wiring-design.md). `worker-realtime` is not wired up yet. See the [auth worker design spec](../../docs/superpowers/specs/2026-08-26-auth-worker-design.md) for what's deliberately deferred (roles/permissions design, wiring up consumers, additional identity providers, custom domain).
+
+`BETTER_AUTH_URL` is set to `worker-client`'s origin, not this worker's own — see the Testing section above.

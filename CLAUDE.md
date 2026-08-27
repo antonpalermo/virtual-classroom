@@ -14,7 +14,7 @@ A virtual classroom / video conferencing app built entirely on Cloudflare Worker
 - `packages/web-standards` (`@capstone/standards`) — generated HTTP status code/phrase constants. See [packages/web-standards/CLAUDE.md](packages/web-standards/CLAUDE.md).
 - `packages/config-typescript` (`@capstone/typescript`) — shared base `tsconfig` files. See [packages/config-typescript/CLAUDE.md](packages/config-typescript/CLAUDE.md).
 
-The three apps are independent Cloudflare Workers deployed separately (no service bindings between them yet) — the client currently has no code that talks to the realtime or auth workers.
+The three apps are independent Cloudflare Workers deployed separately. `worker-client` talks to `worker-auth` via a service binding (`AUTH_SERVICE`, proxying `/api/auth/*`) — see [apps/worker-client/CLAUDE.md](apps/worker-client/CLAUDE.md) and [apps/worker-auth/CLAUDE.md](apps/worker-auth/CLAUDE.md). `worker-realtime` has no service bindings yet.
 
 ## Generated files — never Read in full
 
