@@ -15,5 +15,8 @@
     "observability": {
         "enabled": true
     },
-    "upload_source_maps": true
+    "upload_source_maps": true,
+    "dev": {
+        "inspector_port": 9230
+    }
 }
