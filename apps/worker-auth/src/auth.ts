@@ -30,7 +30,7 @@ export function createAuth(db: Db, env: Env) {
         plugins: [
             jwt(),
             oauthProvider({
-                loginPage: '/sign-in',
+                loginPage: '/login',
                 consentPage: '/consent'
             })
         ]

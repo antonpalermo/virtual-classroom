@@ -17,6 +17,8 @@
     },
     "upload_source_maps": true,
     "dev": {
+        // Default 9229 collides with worker-client's Vite plugin inspector; unlike Vite,
+        // wrangler dev doesn't fall back automatically and crashes fatally on collision.
         "inspector_port": 9230
     }
 }

@@ -1,14 +1,15 @@
 # CLAUDE.md — worker-client
 
-`@capstone/client` — the frontend. React 19 + TanStack Router SPA built with Vite, served by a Cloudflare Worker (via `@cloudflare/vite-plugin`) as static assets, with a thin passthrough worker at `worker/index.ts` for `/api/*`.
+`@capstone/client` — the frontend. React 19 + TanStack Router SPA built with Vite, served by a Cloudflare Worker (via `@cloudflare/vite-plugin`) as static assets, with a thin passthrough worker at `worker/index.ts` proxying `/api/auth/*` to `worker-auth`.
 
 ## Layout
 
 - `src/main.tsx` — entry point.
 - `src/components/app.tsx` — root component.
-- `src/routes/` — file-based routes (`__root.tsx`, `index.tsx`, `room.tsx`). Add/edit files here to change routing.
+- `src/routes/` — file-based routes (`__root.tsx`, `index.tsx`, `room.tsx`, `login.tsx`). Add/edit files here to change routing.
+- `src/lib/auth-client.ts` — the `better-auth/react` client (`authClient`), used by the `/login` route and the home page for sign-in, sign-out, and session state.
 - `src/routeTree.gen.ts` — **generated** by the TanStack Router Vite plugin (`autoCodeSplitting: true`) from `src/routes/`. Don't hand-edit; let the dev server regenerate it.
-- `worker/index.ts` — passthrough Cloudflare Worker handling `/api/*`; everything else is served as static assets.
+- `worker/index.ts` — passthrough Cloudflare Worker; proxies `/api/auth/*` to `worker-auth` via the `AUTH_SERVICE` service binding, 404s everything else under `/api/`.
 - `worker-configuration.d.ts` — **generated** by `wrangler types` (`cf-typegen` script). ~14,900 lines; don't Read it in full (blocked via `.claude/settings.json` deny rule) — `grep` for the specific type/binding you need instead.
 
 `/api/auth/*` is proxied to `worker-auth` via the `AUTH_SERVICE` service binding (see `worker/index.ts`); `src/lib/auth-client.ts` holds the `better-auth/react` client the `/login` route and the home page use. No code here talks to `worker-realtime` yet — the two workers deploy independently with no service binding.
