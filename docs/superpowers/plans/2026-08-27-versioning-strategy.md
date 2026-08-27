@@ -64,11 +64,11 @@ Expected: `OK`.
 
 - [ ] **Step 5: Edit `.changeset/config.json` to match this repo's requirements**
 
-`changeset init` writes `baseBranch: "main"` by default; every other default already matches this repo's requirements (default changelog generator, empty `fixed`/`linked`, `updateInternalDependencies: "patch"`, `access: "restricted"`, empty `ignore`). Edit the file so it reads exactly:
+`changeset init` is interactive in the installed version (`@changesets/cli@3.0.1`) — it prompts for the changelog generator (GitHub vs. the default), whether to auto-commit, package access, and the base branch, rather than writing a bare non-interactive scaffold. It also writes `baseBranch: "main"` by default, which needs changing. Its real written defaults otherwise match this repo's requirements (default changelog generator, empty `fixed`/`linked`, `updateInternalDependencies: "patch"`, `access: "restricted"`, empty `ignore`) — except for two more that the final config below deliberately doesn't carry forward as written: it also defaults to `"format": "auto"` (omitted below since that default is already correct — see the design spec's Configuration section for why) and a version-pinned `"$schema": "https://unpkg.com/@changesets/config@4.0.0/schema.json"` (matching the installed `@changesets/config@4.0.0`), which the config below does keep, pinned the same way. Edit the file so it reads exactly:
 
 ```json
 {
-    "$schema": "https://unpkg.com/@changesets/config/schema.json",
+    "$schema": "https://unpkg.com/@changesets/config@4.0.0/schema.json",
     "changelog": "@changesets/cli/changelog",
     "commit": false,
     "fixed": [],

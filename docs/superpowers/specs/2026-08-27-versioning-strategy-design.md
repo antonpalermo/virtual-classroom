@@ -31,7 +31,7 @@ Two commands matter for this repo; a third (`changeset publish`) is intentionall
 
 ```json
 {
-    "$schema": "https://unpkg.com/@changesets/config/schema.json",
+    "$schema": "https://unpkg.com/@changesets/config@4.0.0/schema.json",
     "changelog": "@changesets/cli/changelog",
     "commit": false,
     "fixed": [],
@@ -53,6 +53,7 @@ Two commands matter for this repo; a third (`changeset publish`) is intentionall
 - `updateInternalDependencies: "patch"` — controls how an *already-scheduled* dependent's dependency-range string and changelog entry get written when it releases alongside a bumped internal dependency. It does **not** decide whether a dependent gets scheduled for release at all: that's decided purely by whether the dependent's existing semver range on the bumped package is still satisfied (confirmed against the installed `@changesets/assemble-release-plan` source). Every internal dependency in this repo is declared as `"*"` (e.g. `apps/worker-realtime`'s `"@capstone/standards": "*"`), which is satisfied by any version — so under this repo's current dependency ranges, bumping one workspace never cascades a release into another. This is set for forward compatibility (it costs nothing and starts working automatically if a workspace ever pins an internal dependency to a narrower range) but has no effect today, and that's the correct outcome given the independent-versioning goal above: a workspace's version should reflect only its own changes, not an unrelated internal dependency bump.
 - `access: "restricted"` — irrelevant in practice since `changeset publish` is never run, but set to the safe default rather than left implicit.
 - `ignore: []` — every workspace participates, including `packages/config-typescript` (its `publishConfig.access: "public"` is pre-existing, unrelated dead config from before this change; it stays `private: true` and unpublished like everything else).
+- `format` is left at its default (`"auto"`, which is why it doesn't appear in the config) — `changeset version` detects and runs this repo's formatter (Biome, via `biome.json`) on the `package.json`/`CHANGELOG.md` files it touches, so generated output lands in repo style automatically.
 - `privatePackages: { "version": true, "tag": false }` — **load-bearing.** Changesets skips versioning any package with `"private": true` in its `package.json` unless this is set — and every workspace in this repo is `private: true` by design (see Non-goals: nothing here is ever published to npm). Without this key, `changeset version` silently no-ops on the entire repo despite reporting success. `version: true` enables bumping; `tag: false` keeps this consistent with the Non-goal below of not tagging releases yet.
 
 ### Root scripts
@@ -68,8 +69,8 @@ No `release`/`publish` script is added, since publishing is out of scope.
 
 ### Workflow
 
-1. On a feature/fix/chore branch, after making a change to one or more workspaces, run `npx changeset`. Pick the affected workspace(s), a bump type for each, write a one-line summary. Commit the generated `.changeset/*.md` file alongside the code change, and include it in the normal PR into `dev`.
-2. Periodically — in practice, before a `dev → main` release PR — run `npx changeset version` (or `npm run version-packages`) on `dev`. This bumps every workspace with pending changesets, updates changelogs, and deletes the consumed changeset files. Commit the result (a "Version Packages" commit) and push directly to `dev`, or via its own small PR — either is fine given there's no CI to gate on yet.
+1. On a feature/fix/chore branch, after making a change to one or more workspaces, run `npm run changeset` (`changeset`). Pick the affected workspace(s), a bump type for each, write a one-line summary. Commit the generated `.changeset/*.md` file alongside the code change, and include it in the normal PR into `dev`.
+2. Periodically — in practice, before a `dev → main` release PR — run `npm run version-packages` (`changeset version`) on `dev`. This bumps every workspace with pending changesets, updates changelogs, and deletes the consumed changeset files. Commit the result (a "Version Packages" commit) and push directly to `dev`, or via its own small PR — either is fine given there's no CI to gate on yet.
 3. `changeset publish` is never run. The version bump itself (visible in each workspace's `package.json` and `CHANGELOG.md`) is the deliverable — it's a record of what shipped in each independently-deployed Worker, not an npm release.
 
 ### Documentation
