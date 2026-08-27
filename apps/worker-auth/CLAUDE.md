@@ -32,4 +32,4 @@ One thing the automated suite can't cover: an actual round trip through Google's
 - `typegen` — `wrangler types` (regenerates `worker-configuration.d.ts`)
 - `test` / `test:run` — Vitest
 
-No code here talks to `worker-client` or `worker-realtime` yet — this worker deploys independently. See the [auth worker design spec](../../docs/superpowers/specs/2026-08-26-auth-worker-design.md) for what's deliberately deferred (roles/permissions design, wiring up consumers, additional identity providers, custom domain).
+`worker-client` talks to this worker via a Cloudflare service binding (`AUTH_SERVICE` in `apps/worker-client/wrangler.jsonc`), proxying `/api/auth/*` requests through — see [docs/superpowers/specs/2026-08-27-client-auth-wiring-design.md](../../docs/superpowers/specs/2026-08-27-client-auth-wiring-design.md). `worker-realtime` is not wired up yet. See the [auth worker design spec](../../docs/superpowers/specs/2026-08-26-auth-worker-design.md) for what's deliberately deferred (roles/permissions design, wiring up consumers, additional identity providers, custom domain).

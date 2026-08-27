@@ -11,7 +11,7 @@
 - `worker/index.ts` — passthrough Cloudflare Worker handling `/api/*`; everything else is served as static assets.
 - `worker-configuration.d.ts` — **generated** by `wrangler types` (`cf-typegen` script). ~14,900 lines; don't Read it in full (blocked via `.claude/settings.json` deny rule) — `grep` for the specific type/binding you need instead.
 
-No code here talks to `worker-realtime` yet — the two workers deploy independently with no service binding.
+`/api/auth/*` is proxied to `worker-auth` via the `AUTH_SERVICE` service binding (see `worker/index.ts`); `src/lib/auth-client.ts` holds the `better-auth/react` client the `/login` route and the home page use. No code here talks to `worker-realtime` yet — the two workers deploy independently with no service binding.
 
 ## Commands (run from this directory, or via `npm run <script> -w @capstone/client` from root)
 
