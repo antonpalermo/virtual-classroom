@@ -1,4 +1,5 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { authClient } from '../lib/auth-client'
 
 export const Route = createFileRoute('/')({
     component: HomeRoute
@@ -6,6 +7,7 @@ export const Route = createFileRoute('/')({
 
 function HomeRoute() {
     const navigate = useNavigate()
+    const { data: session, isPending } = authClient.useSession()
 
     function createRoom() {
         const id = crypto.randomUUID()
@@ -15,6 +17,19 @@ function HomeRoute() {
     return (
         <div className="p-2">
             <h3>Welcome!</h3>
+            {!isPending &&
+                (session ? (
+                    <p>
+                        Signed in as {session.user.email}{' '}
+                        <button type="button" onClick={() => authClient.signOut()}>
+                            Sign out
+                        </button>
+                    </p>
+                ) : (
+                    <p>
+                        <Link to="/login">Sign in</Link>
+                    </p>
+                ))}
             <form>
                 <div>
                     <label htmlFor="room-id">Join</label>
