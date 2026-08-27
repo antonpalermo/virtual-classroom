@@ -14,7 +14,7 @@
 
 - Versioning is independent per workspace — no fixed/linked groups (`"fixed": []`, `"linked": []`).
 - `baseBranch` in `.changeset/config.json` must be `"dev"` (this repo's default integration branch), not the Changesets default of `"main"`.
-- `updateInternalDependencies` must be `"patch"` — an internal dependency's bump patch-bumps its in-repo dependents.
+- `updateInternalDependencies` must be `"patch"` — kept for forward compatibility (it governs how an already-scheduled dependent's dependency-range string and changelog entry are written), but with every internal dependency in this repo declared as `"*"`, it never causes a dependent to be scheduled for release in the first place — see Task 2.
 - `.changeset/config.json` must set `"privatePackages": { "version": true, "tag": false }`. Every workspace is `private: true`, and Changesets' `shouldSkipPackage` (confirmed in the installed `@changesets/should-skip-package` source) skips versioning any package with `private: true` unless this is set — without it, `changeset version` silently no-ops on this entire repo despite reporting success. `tag: false` matches the deferred git-tagging decision below.
 - `changeset publish` is never used and no publish/release script is added — every workspace is `private: true`, deployed as a Cloudflare Worker or consumed only in-repo, never published to npm.
 - No per-package allowlist anywhere — Changesets must discover workspaces via the root `workspaces` field (`["apps/*", "packages/*"]`) so new workspaces participate automatically.
@@ -126,14 +126,14 @@ git commit -m "chore: install and configure Changesets"
 
 **Files:**
 - Create (temporary, reverted at the end of this task): `.changeset/trial-verify-setup.md`
-- Modify (temporary, reverted at the end of this task): `packages/web-standards/package.json`, `apps/worker-realtime/package.json`
-- Create (temporary, deleted at the end of this task): `packages/web-standards/CHANGELOG.md`, `apps/worker-realtime/CHANGELOG.md`
+- Modify (temporary, reverted at the end of this task): `packages/web-standards/package.json`
+- Create (temporary, deleted at the end of this task): `packages/web-standards/CHANGELOG.md`
 
 **Interfaces:**
 - Consumes: `npm run version-packages` from Task 1.
 - Produces: nothing persists — this task's job is to prove Task 1's config works, then leave the working tree exactly as Task 1's commit left it.
 
-`apps/worker-realtime/package.json` declares `"@capstone/standards": "*"` under `dependencies` (confirmed by reading the file — this is the one workspace with a real, non-dev dependency on `@capstone/standards`), so bumping `@capstone/standards` is the clearest way to prove `updateInternalDependencies: "patch"` actually cascades a bump to a dependent.
+`apps/worker-realtime/package.json` declares `"@capstone/standards": "*"` under `dependencies`. `"*"` is satisfied by every version, so Changesets never schedules `@capstone/realtime` for a release on a `@capstone/standards` bump — `updateInternalDependencies` (confirmed against the installed `@changesets/assemble-release-plan` source) only rewrites an *already-scheduled* dependent's dependency-range string and changelog entry; it does not decide whether a dependent gets scheduled in the first place. That decision is purely `!semverSatisfies(nextVersion, versionRange)`, which is never true for a `"*"` range. So bumping `@capstone/standards` here correctly stays isolated to that one workspace — this is the expected behavior, not a gap, and it's the right way to confirm this repo's independent-versioning goal actually holds: an internal dependency changing does NOT ripple a version bump through workspaces that didn't themselves change.
 
 - [ ] **Step 1: Write a trial changeset file**
 
@@ -167,27 +167,27 @@ test -f packages/web-standards/CHANGELOG.md && echo OK
 
 Expected: `OK`.
 
-- [ ] **Step 4: Verify `@capstone/realtime` bumped as a dependent**
+- [ ] **Step 4: Verify `@capstone/realtime` was NOT bumped, despite depending on `@capstone/standards`**
 
 ```bash
 npm pkg get version -w apps/worker-realtime
 ```
 
-Expected: `"0.0.1"` (was `"0.0.0"`) — this confirms `updateInternalDependencies: "patch"` cascaded the bump.
+Expected: `"0.0.0"` (unchanged) — its `"@capstone/standards": "*"` dependency range is satisfied by any version, so Changesets never schedules it for release. This confirms independent versioning actually holds: an internal dependency change doesn't ripple a bump into a workspace whose own code didn't change.
 
 ```bash
-test -f apps/worker-realtime/CHANGELOG.md && echo OK
+test -f apps/worker-realtime/CHANGELOG.md && echo EXISTS || echo ABSENT
 ```
 
-Expected: `OK`.
+Expected: `ABSENT` (the file should not exist — `test -f` fails, so the `&&` branch is skipped and the `||` branch fires).
 
-- [ ] **Step 5: Verify unrelated workspaces were left untouched**
+- [ ] **Step 5: Verify remaining unrelated workspaces were left untouched**
 
 ```bash
 npm pkg get version -w apps/worker-client -w apps/worker-auth -w packages/config-typescript
 ```
 
-Expected: all three still report `"0.0.0"` — neither depends on `@capstone/standards`, so they must not have moved.
+Expected: all three still report `"0.0.0"` — none depends on `@capstone/standards`, so none should have moved.
 
 - [ ] **Step 6: Verify the trial changeset file was consumed**
 
@@ -200,8 +200,8 @@ Expected: `CONSUMED` (`changeset version` deletes changeset files it applies).
 - [ ] **Step 7: Revert the trial — restore the working tree to Task 1's committed state**
 
 ```bash
-git checkout -- packages/web-standards/package.json apps/worker-realtime/package.json
-rm -f packages/web-standards/CHANGELOG.md apps/worker-realtime/CHANGELOG.md
+git checkout -- packages/web-standards/package.json
+rm -f packages/web-standards/CHANGELOG.md
 git status --porcelain
 ```
 
