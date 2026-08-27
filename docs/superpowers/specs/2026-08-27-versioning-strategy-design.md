@@ -39,7 +39,11 @@ Two commands matter for this repo; a third (`changeset publish`) is intentionall
     "access": "restricted",
     "baseBranch": "dev",
     "updateInternalDependencies": "patch",
-    "ignore": []
+    "ignore": [],
+    "privatePackages": {
+        "version": true,
+        "tag": false
+    }
 }
 ```
 
@@ -49,6 +53,7 @@ Two commands matter for this repo; a third (`changeset publish`) is intentionall
 - `updateInternalDependencies: "patch"` — if a workspace bumps and another workspace in this monorepo depends on it (e.g. `@capstone/standards` bumping should patch-bump `@capstone/realtime`, which depends on it), the dependent gets an automatic patch bump too, so its `package.json` dependency range stays satisfied and its own version reflects that its resolved dependency changed.
 - `access: "restricted"` — irrelevant in practice since `changeset publish` is never run, but set to the safe default rather than left implicit.
 - `ignore: []` — every workspace participates, including `packages/config-typescript` (its `publishConfig.access: "public"` is pre-existing, unrelated dead config from before this change; it stays `private: true` and unpublished like everything else).
+- `privatePackages: { "version": true, "tag": false }` — **load-bearing.** Changesets skips versioning any package with `"private": true` in its `package.json` unless this is set — and every workspace in this repo is `private: true` by design (see Non-goals: nothing here is ever published to npm). Without this key, `changeset version` silently no-ops on the entire repo despite reporting success. `version: true` enables bumping; `tag: false` keeps this consistent with the Non-goal below of not tagging releases yet.
 
 ### Root scripts
 

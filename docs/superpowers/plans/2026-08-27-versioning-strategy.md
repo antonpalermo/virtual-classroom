@@ -15,6 +15,7 @@
 - Versioning is independent per workspace — no fixed/linked groups (`"fixed": []`, `"linked": []`).
 - `baseBranch` in `.changeset/config.json` must be `"dev"` (this repo's default integration branch), not the Changesets default of `"main"`.
 - `updateInternalDependencies` must be `"patch"` — an internal dependency's bump patch-bumps its in-repo dependents.
+- `.changeset/config.json` must set `"privatePackages": { "version": true, "tag": false }`. Every workspace is `private: true`, and Changesets' `shouldSkipPackage` (confirmed in the installed `@changesets/should-skip-package` source) skips versioning any package with `private: true` unless this is set — without it, `changeset version` silently no-ops on this entire repo despite reporting success. `tag: false` matches the deferred git-tagging decision below.
 - `changeset publish` is never used and no publish/release script is added — every workspace is `private: true`, deployed as a Cloudflare Worker or consumed only in-repo, never published to npm.
 - No per-package allowlist anywhere — Changesets must discover workspaces via the root `workspaces` field (`["apps/*", "packages/*"]`) so new workspaces participate automatically.
 
@@ -75,7 +76,11 @@ Expected: `OK`.
     "access": "restricted",
     "baseBranch": "dev",
     "updateInternalDependencies": "patch",
-    "ignore": []
+    "ignore": [],
+    "privatePackages": {
+        "version": true,
+        "tag": false
+    }
 }
 ```
 
