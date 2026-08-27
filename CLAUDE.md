@@ -71,3 +71,16 @@ Hotfix exception — for urgent production bugs that can't wait for `dev` to be 
 3. Immediately merge `main` back into `dev` so `dev` doesn't drift.
 
 No CI or branch protection rules exist yet — this is a documented convention only. See `docs/superpowers/specs/2026-08-25-branching-strategy-design.md` for the full design rationale and deferred items (CI-backed protection, per-Worker release tagging).
+
+## Versioning
+
+Every workspace's `package.json` carries a real, independently-bumped `version` — no workspace stays pinned at `0.0.0` forever. Versioning is handled by [Changesets](https://github.com/changesets/changesets) (`@changesets/cli`), configured in `.changeset/config.json`. It reads the root `workspaces` field, so any new workspace under `apps/*` or `packages/*` participates automatically — no config change needed.
+
+Nothing here is published to npm — every workspace is `private: true` and deployed as a Cloudflare Worker (or consumed only within the monorepo). `changeset publish` is never used; the version bump itself (and its `CHANGELOG.md` entry) is the deliverable, a record of what shipped in each independently-deployed Worker.
+
+Workflow:
+
+1. On a feature/fix/chore branch, after changing one or more workspaces, run `npx changeset`. Pick the affected workspace(s), a bump type (patch/minor/major) for each, and write a short summary. Commit the generated `.changeset/*.md` file alongside the code change and include it in the normal PR into `dev`.
+2. Periodically — in practice, before a `dev → main` release PR — run `npm run version-packages` (`changeset version`) on `dev`. This bumps every workspace with a pending changeset, updates each affected workspace's `CHANGELOG.md`, and deletes the consumed changeset files. Commit the result and push directly to `dev`, or via its own small PR.
+
+See `docs/superpowers/specs/2026-08-27-versioning-strategy-design.md` for the full design rationale and deferred items (CI automation of the version-bump step, git tagging tied to releases).
