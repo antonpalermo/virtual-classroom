@@ -50,10 +50,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version-file: package.json
+          node-version: 22
           cache: npm
       - run: npm ci
-      - uses: changesets/action@v1
+      - uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
           version: npm run version-packages
         env:
@@ -66,7 +66,8 @@ Notes on specific choices:
 - `concurrency` — keyed on the ref, so two pushes to `dev` in quick succession don't race two runs against the same "Version Packages" PR branch. `cancel-in-progress: false` since letting the later run simply update the PR again is safer than cancelling a mid-flight commit.
 - `version: npm run version-packages` — reuses the exact script Task 1 of the versioning-strategy plan added (`"version-packages": "changeset version"`), so CI and a manual local run do the same thing.
 - No `publish` input — see Non-goals. Omitting it is what keeps this action from ever attempting an npm publish.
-- `node-version-file: package.json` — reads the root `package.json`'s `engines.node` (already repo convention via Turborepo/Volta-style pinning if present; falls back gracefully if absent) rather than hardcoding a version in the workflow.
+- `node-version: 22` — pinned explicitly. An earlier draft used `node-version-file: package.json`, but `actions/setup-node` reads `engines.node` (`>=18` here) and resolves an unbounded range to whatever Node major is newest at the time the job runs — not a pin. Nothing else in this repo pins Node (no Volta config), so CI's runtime would otherwise silently drift across Node majors as new ones release. An explicit version keeps the workflow's runtime stable and predictable; bump it deliberately when needed.
+- `changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0` — pinned to a commit SHA rather than the mutable `v1` branch ref. This is the only third-party action in the workflow and it runs with `contents: write` + `pull-requests: write`; SHA-pinning (with the version in a trailing comment for readability) is the standard supply-chain hardening for third-party actions with write permissions. `actions/checkout@v4` and `actions/setup-node@v4` are first-party GitHub actions, where tag-pinning is the accepted convention and is left as-is.
 
 ### Behavior / workflow
 
@@ -78,11 +79,18 @@ Notes on specific choices:
 
 ### Sequencing dependency
 
-This workflow's `version: npm run version-packages` step depends on the `version-packages` script and `.changeset/config.json` added by the versioning-strategy work (PR #21), which is not yet merged into `dev` as of this design. This workflow cannot do anything useful until that PR merges — the implementation plan for this design should either wait for PR #21 to land first, or land this workflow file in the same window and confirm both are present on `dev` before relying on it.
+This workflow's `version: npm run version-packages` step depends on the `version-packages` script and `.changeset/config.json` added by the versioning-strategy work (PR #21), which is not yet merged into `dev` as of this design. This workflow cannot do anything useful until that PR merges — the implementation plan for this design should either wait for PR #21 to land first, or land this workflow file in the same window and confirm both are present on `dev` before relying on it. **Resolved:** PR #21 merged into `dev` on 2026-08-28 (commit `fbaa0d9`), before this branch's implementation began — the dependency is satisfied.
 
 ### Documentation
 
 Root `CLAUDE.md`'s `## Versioning` section (added by the versioning-strategy work) is updated to describe the bot-driven PR flow in place of "run this manually," and to note that this is the repo's first CI workflow — worth calling out since `## Branching` currently states flatly that "No CI or branch protection rules exist yet."
+
+### Operational prerequisites
+
+Two things aren't visible in the workflow YAML and are worth writing down:
+
+- **Repo setting: "Allow GitHub Actions to create and approve pull requests."** `changesets/action` opens its "Version Packages" PR using the default `GITHUB_TOKEN`. Even though this workflow's own `permissions:` block grants `pull-requests: write`, GitHub also gates PR creation by Actions behind a separate, repo-level toggle (Settings → Actions → General → Workflow permissions). As of this writing that toggle is OFF for this repo (`gh api repos/antonpalermo/virtual-classroom/actions/permissions/workflow` → `"can_approve_pull_request_reviews": false`), so the workflow's first real PR-opening run will fail with a permissions error until it's enabled.
+- **PRs opened by the default `GITHUB_TOKEN` don't trigger other workflows.** Harmless today since this is the only workflow in the repo, but once a lint/test CI gate is added (an explicitly deferred item — see Non-goals), the bot-opened "Version Packages" PR will show zero checks unless that's accounted for.
 
 ## Testing / verification
 

@@ -72,7 +72,7 @@ Hotfix exception — for urgent production bugs that can't wait for `dev` to be 
 2. PR it into `main` and merge.
 3. Immediately merge `main` back into `dev` so `dev` doesn't drift.
 
-No branch protection rules exist yet — merging still relies on this documented convention, not enforced checks. A CI workflow does exist as of `docs/superpowers/specs/2026-08-28-ci-version-bump-design.md` (see `## Versioning`), but it only automates version bumps; it doesn't gate merges. See `docs/superpowers/specs/2026-08-25-branching-strategy-design.md` for the full branching design rationale and remaining deferred items (CI-backed protection, per-Worker release tagging).
+No branch protection rules exist yet — merging still relies on this documented convention, not enforced checks. A CI workflow does exist (`.github/workflows/version.yml`, designed in `docs/superpowers/specs/2026-08-28-ci-version-bump-design.md`), but it only automates version bumps; it doesn't gate merges. See `docs/superpowers/specs/2026-08-25-branching-strategy-design.md` for the full branching design rationale and remaining deferred items (CI-backed protection, per-Worker release tagging).
 
 ## Versioning
 
