@@ -72,7 +72,7 @@ Hotfix exception — for urgent production bugs that can't wait for `dev` to be 
 2. PR it into `main` and merge.
 3. Immediately merge `main` back into `dev` so `dev` doesn't drift.
 
-No CI or branch protection rules exist yet — this is a documented convention only. See `docs/superpowers/specs/2026-08-25-branching-strategy-design.md` for the full design rationale and deferred items (CI-backed protection, per-Worker release tagging).
+No branch protection rules exist yet — merging still relies on this documented convention, not enforced checks. A CI workflow does exist (`.github/workflows/version.yml`, designed in `docs/superpowers/specs/2026-08-28-ci-version-bump-design.md`), but it only automates version bumps; it doesn't gate merges. See `docs/superpowers/specs/2026-08-25-branching-strategy-design.md` for the full branching design rationale and remaining deferred items (CI-backed protection, per-Worker release tagging).
 
 ## Versioning
 
@@ -85,6 +85,6 @@ Every internal dependency in this repo is declared as `"*"` (e.g. `apps/worker-r
 Workflow:
 
 1. On a feature/fix/chore branch, after changing one or more workspaces, run `npm run changeset` (`changeset`). Pick the affected workspace(s), a bump type (patch/minor/major) for each, and write a short summary. Commit the generated `.changeset/*.md` file alongside the code change and include it in the normal PR into `dev`.
-2. Periodically — in practice, before a `dev → main` release PR — run `npm run version-packages` (`changeset version`) on `dev`. This bumps every workspace with a pending changeset, updates each affected workspace's `CHANGELOG.md`, and deletes the consumed changeset files. Commit the result and push directly to `dev`, or via its own small PR.
+2. A GitHub Actions workflow (`.github/workflows/version.yml`) watches `dev`. Every push to `dev` that leaves pending changesets causes it to open (or update in place) a bot-maintained "Version Packages" PR — the diff is exactly what `npm run version-packages` (`changeset version`) would produce locally: bumped `package.json` `version` fields, updated `CHANGELOG.md` files, and the consumed changeset files removed. Review and merge that PR into `dev` whenever you're ready to include those bumps in the next `dev → main` release — this is now the normal path. `npm run version-packages` still works locally as a manual fallback (e.g. if CI is down), but you shouldn't need to run it by hand in the ordinary case.
 
-See `docs/superpowers/specs/2026-08-27-versioning-strategy-design.md` for the full design rationale and deferred items (CI automation of the version-bump step, git tagging tied to releases).
+See `docs/superpowers/specs/2026-08-27-versioning-strategy-design.md` for the original design rationale, and `docs/superpowers/specs/2026-08-28-ci-version-bump-design.md` for the CI workflow that now automates the version-bump step. Git tagging tied to releases remains deferred.

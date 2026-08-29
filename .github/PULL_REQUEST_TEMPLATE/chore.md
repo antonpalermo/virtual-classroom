@@ -22,7 +22,7 @@
 
 ## How was this tested
 
-<!-- Manual verification steps — there's no CI yet, so this is the record of how you know it works. -->
+<!-- Manual verification steps — the only CI here bumps versions, it doesn't verify code, so this is the record of how you know it works. -->
 
 ## Checklist
 
