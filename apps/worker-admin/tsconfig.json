@@ -1,0 +1,7 @@
+{
+    "extends": "@capstone/typescript/configs/tsconfig.worker.json",
+    "compilerOptions": {
+        "types": ["./worker-configuration.d.ts", "node"]
+    },
+    "exclude": ["node_modules"]
+}

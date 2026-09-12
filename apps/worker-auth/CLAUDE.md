@@ -5,7 +5,7 @@
 ## Layout
 
 - `src/index.ts` — Hono app. Serves a trivial `/` health route and mounts Better Auth's handler at `/api/auth/*`.
-- `src/auth.ts` — `createAuth(db, env)`, the Better Auth factory (Google social provider, `role` additional field, `jwt` + `oauthProvider` plugins). Built as a factory rather than a module-level singleton because the D1 binding only exists inside a request's `env`.
+- `src/auth.ts` — `createAuth(db, env)`, the Better Auth factory (Google social provider, `role` additional field, `jwt` + `oauthProvider` + `admin` + `bearer` plugins). Built as a factory rather than a module-level singleton because the D1 binding only exists inside a request's `env`.
 - `src/db/client.ts` — `createDb(d1)`, wraps the `AUTH_DB` binding in a Drizzle client.
 - `src/db/schema.ts` — **generated** by `npx auth@latest generate` (see `auth.cli.ts` below), then owned/hand-edited from there. Don't hand-author from scratch; regenerate after adding/changing plugins.
 - `auth.cli.ts` — Node-only shim used solely by the Better Auth CLI to generate `src/db/schema.ts` (the CLI can't see a real D1 binding). Never imported by the Worker itself.
@@ -14,8 +14,10 @@
 
 ## Regenerating the schema after a config change
 
+`auth@latest` can resolve to a version bundling a newer, schema-incompatible `@better-auth/core` than this project's pinned `better-auth@^1.7.1` — this has silently dropped an existing column (`account.issuer` and its unique index) before, which `drizzle-kit generate` would then turn into a destructive migration. Pin the version to match, and review the generated diff (`git diff src/db/schema.ts`, expecting only additive changes) before running `drizzle-kit generate` on it.
+
 ```bash
-npx auth@latest generate --config ./auth.cli.ts --adapter drizzle --dialect sqlite --output src/db/schema.ts -y
+npx auth@1.7.1 generate --config ./auth.cli.ts --adapter drizzle --dialect sqlite --output src/db/schema.ts -y
 npx drizzle-kit generate
 ```
 
@@ -32,6 +34,8 @@ One thing the automated suite can't cover: an actual round trip through Google's
 - `typegen` — `wrangler types` (regenerates `worker-configuration.d.ts`)
 - `test` / `test:run` — Vitest
 
-`worker-client` talks to this worker via a Cloudflare service binding (`AUTH_SERVICE` in `apps/worker-client/wrangler.jsonc`), proxying `/api/auth/*` requests through — see [docs/superpowers/specs/2026-08-27-client-auth-wiring-design.md](../../docs/superpowers/specs/2026-08-27-client-auth-wiring-design.md). `worker-realtime` is not wired up yet. See the [auth worker design spec](../../docs/superpowers/specs/2026-08-26-auth-worker-design.md) for what's deliberately deferred (roles/permissions design, wiring up consumers, additional identity providers, custom domain).
+`ADMIN_USER_IDS` (comma-separated Better Auth user ids) bootstraps the first admin account(s) — see the `admin` plugin config in `src/auth.ts` and [apps/worker-admin/CLAUDE.md](../worker-admin/CLAUDE.md). To bootstrap the first admin: sign in once through the normal Google flow, then look up the resulting user id with `wrangler d1 execute AUTH_DB --command "select id, email from user"` (add `--remote` for the deployed DB; omit it for local dev). Set the id in `.dev.vars` for local dev, or `wrangler secret put ADMIN_USER_IDS` for a deployed worker — there's no `vars` entry for it in `wrangler.jsonc`. The list is read fresh from `env` on every `createAuth()` call, so `wrangler dev` picks up a `.dev.vars` change on the next request with no restart; a deployed Worker needs the new secret to finish propagating (or a fresh deploy) before it takes effect.
+
+`worker-client` talks to this worker via a Cloudflare service binding (`AUTH_SERVICE` in `apps/worker-client/wrangler.jsonc`), proxying `/api/auth/*` requests through — see [docs/superpowers/specs/2026-08-27-client-auth-wiring-design.md](../../docs/superpowers/specs/2026-08-27-client-auth-wiring-design.md). `worker-admin` talks to this worker the same way (its own `AUTH_SERVICE` binding) and additionally relies on the `admin` and `bearer` plugins configured here — see [apps/worker-admin/CLAUDE.md](../worker-admin/CLAUDE.md) and [docs/superpowers/specs/2026-09-12-worker-admin-design.md](../../docs/superpowers/specs/2026-09-12-worker-admin-design.md). `worker-realtime` is not wired up yet. See the [auth worker design spec](../../docs/superpowers/specs/2026-08-26-auth-worker-design.md) for what's still deferred (additional identity providers, custom domain) and the worker-admin spec for the roles/permissions/admin-UI follow-up.
 
 `BETTER_AUTH_URL` is set to `worker-client`'s origin, not this worker's own — see the Testing section above.
