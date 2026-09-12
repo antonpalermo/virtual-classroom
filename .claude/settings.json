@@ -1,13 +1,30 @@
 {
-    "enabledPlugins": {
-        "superpowers@claude-plugins-official": true
-    },
     "attribution": {
         "commit": "",
         "pr": "",
         "sessionUrl": false
     },
     "permissions": {
+        "allow": [
+            "Bash(git status:*)",
+            "Bash(git diff:*)",
+            "Bash(git log:*)",
+            "Bash(git show:*)",
+            "Bash(ls:*)",
+            "Bash(find:*)",
+            "Bash(wc:*)",
+            "Bash(cat:*)",
+            "Bash(turbo run build:*)",
+            "Bash(turbo run dev:*)",
+            "Bash(turbo run lint:*)",
+            "Bash(turbo run check-types:*)",
+            "Bash(turbo run typegen:*)",
+            "Bash(npm run build:*)",
+            "Bash(npm run dev:*)",
+            "Bash(npm run lint:*)",
+            "Bash(npm run check-types:*)",
+            "Bash(npm run typegen:*)"
+        ],
         "deny": [
             "Read(./**/worker-configuration.d.ts)",
             "Read(./package-lock.json)",
@@ -30,26 +47,10 @@
             "Bash(npm uninstall:*)",
             "Bash(npm remove:*)",
             "Bash(npm rm:*)"
-        ],
-        "allow": [
-            "Bash(git status:*)",
-            "Bash(git diff:*)",
-            "Bash(git log:*)",
-            "Bash(git show:*)",
-            "Bash(ls:*)",
-            "Bash(find:*)",
-            "Bash(wc:*)",
-            "Bash(cat:*)",
-            "Bash(turbo run build:*)",
-            "Bash(turbo run dev:*)",
-            "Bash(turbo run lint:*)",
-            "Bash(turbo run check-types:*)",
-            "Bash(turbo run typegen:*)",
-            "Bash(npm run build:*)",
-            "Bash(npm run dev:*)",
-            "Bash(npm run lint:*)",
-            "Bash(npm run check-types:*)",
-            "Bash(npm run typegen:*)"
         ]
+    },
+    "enabledPlugins": {
+        "superpowers@claude-plugins-official": true,
+        "ponytail@ponytail": true
     }
 }
