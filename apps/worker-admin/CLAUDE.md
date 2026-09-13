@@ -35,4 +35,4 @@ The very first admin account is granted via `worker-auth`'s `ADMIN_USER_IDS` env
 
 ## TypeScript config
 
-`tsconfig.json` is a references-only shell pointing at `tsconfig.app.json` (browser/React code under `src/`), `tsconfig.node.json` (Vite config), and `tsconfig.worker.json` (the backend under `worker/`, extending `@capstone/typescript/configs/tsconfig.worker.json` and typed against `worker-configuration.d.ts`). Same shape as `apps/worker-client`, except the worker config stays on the shared base rather than a local one.
+`tsconfig.json` is a references-only shell pointing at `tsconfig.app.json` (browser/React code under `src/`), `tsconfig.node.json` (Vite config), and `tsconfig.worker.json` (the backend under `worker/`, typed against `worker-configuration.d.ts`) — all three extending the shared bases in `@capstone/typescript/configs/` (see `packages/config-typescript/CLAUDE.md`). Same shape as `apps/worker-client`.
