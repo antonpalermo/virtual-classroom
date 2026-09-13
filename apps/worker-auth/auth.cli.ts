@@ -3,11 +3,12 @@
 // so this constructs `createAuth` with a placeholder database — schema
 // generation only reads the configured plugins/fields, it never queries.
 // Never imported by the real Worker (see src/index.ts).
-import { drizzle } from 'drizzle-orm/d1'
+
 import { createAuth } from './src/auth'
+import { createDb } from './src/db/client'
 
 const placeholderD1 = {} as D1Database
-const db = drizzle(placeholderD1)
+const db = createDb(placeholderD1)
 
 export const auth = createAuth(db, {
     BETTER_AUTH_URL: 'http://localhost:8787',
