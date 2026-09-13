@@ -28,6 +28,8 @@
 `tsconfig.json` is a references-only shell pointing at:
 - `tsconfig.app.json` — browser/React code under `src/`
 - `tsconfig.node.json` — Vite config
-- `tsconfig.worker.json` — the passthrough worker under `worker/`; extends `tsconfig.node.json` and types against `worker-configuration.d.ts`
+- `tsconfig.worker.json` — the passthrough worker under `worker/`; types against `worker-configuration.d.ts`
+
+All three extend the shared bases in `@capstone/typescript/configs/` (see `packages/config-typescript/CLAUDE.md`), adding only `tsBuildInfoFile`/`include`/`types` locally.
 
 Biome (repo root config) handles formatting and linting, including React-specific rules (hooks, refresh) via the `react` linter domain — there is no separate ESLint config.

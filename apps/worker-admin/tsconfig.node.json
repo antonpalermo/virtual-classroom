@@ -1,7 +1,7 @@
 {
     "extends": "@capstone/typescript/configs/tsconfig.node.json",
     "compilerOptions": {
-        "tsBuildInfoFile": "../../node_modules/.tmp/client/tsconfig.node.tsbuildinfo"
+        "tsBuildInfoFile": "../../node_modules/.tmp/admin/tsconfig.node.tsbuildinfo"
     },
     "include": ["vite.config.ts"]
 }

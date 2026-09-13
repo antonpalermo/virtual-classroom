@@ -1,7 +1,7 @@
 {
     "extends": "@capstone/typescript/configs/tsconfig.app.json",
     "compilerOptions": {
-        "tsBuildInfoFile": "../../node_modules/.tmp/client/tsconfig.app.tsbuildinfo"
+        "tsBuildInfoFile": "../../node_modules/.tmp/admin/tsconfig.app.tsbuildinfo"
     },
     "include": ["src"]
 }
