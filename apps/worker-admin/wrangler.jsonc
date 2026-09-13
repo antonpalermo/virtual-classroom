@@ -5,18 +5,16 @@
 {
     "$schema": "../../node_modules/wrangler/config-schema.json",
     "name": "worker-admin",
-    "main": "src/index.ts",
+    "main": "worker/index.ts",
     "compatibility_date": "2026-08-22",
+    "assets": {
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/auth/*"]
+    },
     "observability": {
         "enabled": true
     },
     "upload_source_maps": true,
-    "dev": {
-        // 8787/8788/8789 are taken by wrangler's default and worker-realtime/worker-auth;
-        // 9229/9230/9231 by worker-client's Vite inspector, worker-realtime, and worker-auth.
-        "port": 8790,
-        "inspector_port": 9232
-    },
     /**
      * Service Bindings (communicate between multiple Workers)
      * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings

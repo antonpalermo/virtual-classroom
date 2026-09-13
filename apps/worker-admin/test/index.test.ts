@@ -1,7 +1,7 @@
 import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
 import { it } from 'vitest'
-import app from '../src/index'
+import app from '../worker/index'
 
 it('forwards /api/auth/* requests to the AUTH_SERVICE binding', async ({ expect }) => {
     const ctx = createExecutionContext()
