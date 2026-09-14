@@ -21,6 +21,15 @@ it('leaves the callback redirect untouched when there is no returnTo param', asy
     expect(response.headers.get('location')).toBe('https://example.com/')
 })
 
+it('relays a non-callback redirect byte-for-byte, without rewriting it', async ({ expect }) => {
+    const ctx = createExecutionContext()
+    const response = await app.fetch(new Request('https://example.com/api/auth/some-other-redirect'), env, ctx)
+    await waitOnExecutionContext(ctx)
+
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe('https://example.com/elsewhere')
+})
+
 it('forwards other /api/auth/* requests untouched', async ({ expect }) => {
     const ctx = createExecutionContext()
     const response = await app.fetch(new Request('https://example.com/api/auth/get-session'), env, ctx)

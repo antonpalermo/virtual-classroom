@@ -24,6 +24,12 @@ export default defineConfig({
                                 headers: { location: 'https://example.com/', 'set-auth-token': 'test-token' }
                             })
                         }
+                        if (url.pathname === '/api/auth/some-other-redirect') {
+                            return new Response(null, {
+                                status: 302,
+                                headers: { location: 'https://example.com/elsewhere', 'set-auth-token': 'test-token' }
+                            })
+                        }
                         return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })
                     }
                 }
