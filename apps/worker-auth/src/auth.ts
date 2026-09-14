@@ -2,6 +2,7 @@ import { oauthProvider } from '@better-auth/oauth-provider'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin, bearer, jwt } from 'better-auth/plugins'
+import { ac, adminRole, managerRole, userRole } from './access-control'
 import type { Db } from './db/client'
 
 export function createAuth(db: Db, env: Env) {
@@ -37,6 +38,8 @@ export function createAuth(db: Db, env: Env) {
                 consentPage: '/consent'
             }),
             admin({
+                ac,
+                roles: { admin: adminRole, manager: managerRole, user: userRole },
                 // adminUserIds bootstraps the first admin account(s) without a manual DB write
                 // or an existing admin to grant the role — any user whose id is listed here is
                 // treated as an admin regardless of their `role` column (confirmed against
