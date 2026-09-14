@@ -67,7 +67,11 @@ export const managerRestrictions = {
                     const session = await sessionFor(ctx)
                     if (!roleList(session?.user.role).includes('manager')) return
 
-                    const requestedRole = ctx.path === '/admin/update-user' ? ctx.body?.data?.role : ctx.body?.role
+                    // `createUser` (node_modules/better-auth/dist/plugins/admin/routes.mjs) accepts
+                    // the new user's role via EITHER field and does `ctx.body.role ?? dataRole` —
+                    // so create-user has to check both, not just the top-level one.
+                    const requestedRole =
+                        ctx.path === '/admin/update-user' ? ctx.body?.data?.role : (ctx.body?.role ?? ctx.body?.data?.role)
                     if (roleList(requestedRole).includes('admin')) {
                         throw new APIError('FORBIDDEN', { message: 'Managers cannot grant the admin role.' })
                     }

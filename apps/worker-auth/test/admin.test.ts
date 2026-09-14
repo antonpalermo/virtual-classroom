@@ -372,6 +372,13 @@ describe('manager restrictions over bearer auth', () => {
         expect(response.status).toBe(403)
     })
 
+    it('rejects a manager creating a brand-new admin via create-user with a nested data.role', async ({ expect }) => {
+        const { token } = await bearerTokenForRole({ sub: 'google-54', email: 'ola@example.com', name: 'Ola' }, 'manager')
+
+        const response = await adminPost('create-user', token, { email: 'newadmin2@example.com', name: 'New2', data: { role: 'admin' } })
+        expect(response.status).toBe(403)
+    })
+
     it('leaves a real admin unaffected on every restricted endpoint over bearer auth', async ({ expect }) => {
         const { token } = await bearerTokenForRole({ sub: 'google-51', email: 'mac@example.com', name: 'Mac' }, 'admin')
         await signInWithGoogle({ sub: 'google-52', email: 'nia@example.com', name: 'Nia' })
