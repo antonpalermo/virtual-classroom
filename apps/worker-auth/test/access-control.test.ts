@@ -1,19 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import { adminRole, managerRole, userRole } from '../src/access-control'
 
+const allUserActions = ['create', 'list', 'set-role', 'ban', 'impersonate', 'delete', 'set-password', 'set-email', 'get', 'update'] as const
+
+const allSessionActions = ['list', 'revoke', 'delete'] as const
+
 describe('access-control roles', () => {
-    it('lets admin list, set-role, ban, and delete users', () => {
-        expect(adminRole.authorize({ user: ['list'] }).success).toBe(true)
-        expect(adminRole.authorize({ user: ['set-role'] }).success).toBe(true)
-        expect(adminRole.authorize({ user: ['ban'] }).success).toBe(true)
-        expect(adminRole.authorize({ user: ['delete'] }).success).toBe(true)
+    it('lets admin perform every user and session action', () => {
+        for (const action of allUserActions) {
+            expect(adminRole.authorize({ user: [action] }).success).toBe(true)
+        }
+        for (const action of allSessionActions) {
+            expect(adminRole.authorize({ session: [action] }).success).toBe(true)
+        }
     })
 
-    it('lets manager list, set-role, ban, and delete users too', () => {
-        expect(managerRole.authorize({ user: ['list'] }).success).toBe(true)
-        expect(managerRole.authorize({ user: ['set-role'] }).success).toBe(true)
-        expect(managerRole.authorize({ user: ['ban'] }).success).toBe(true)
-        expect(managerRole.authorize({ user: ['delete'] }).success).toBe(true)
+    it('gives manager the exact same user and session grants as admin', () => {
+        for (const action of allUserActions) {
+            expect(managerRole.authorize({ user: [action] }).success).toBe(true)
+        }
+        for (const action of allSessionActions) {
+            expect(managerRole.authorize({ session: [action] }).success).toBe(true)
+        }
     })
 
     it('gives user no admin-plugin permissions', () => {

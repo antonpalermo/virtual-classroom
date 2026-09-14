@@ -149,6 +149,14 @@ describe('admin plugin', () => {
         await signInWithGoogle({ sub: 'google-21', email: 'noah@example.com', name: 'Noah' })
         const targetId = await userIdForEmail('noah@example.com')
 
+        const listResponse = await callAsApp(
+            new Request('https://example.com/api/auth/admin/list-users?limit=10', { headers: { cookie: freshManagerCookie } }),
+            { ADMIN_USER_IDS: '' }
+        )
+        expect(listResponse.status).toBe(200)
+        const { users } = await listResponse.json<{ users: { email: string }[] }>()
+        expect(users.some(u => u.email === 'noah@example.com')).toBe(true)
+
         const setRoleResponse = await callAsApp(
             new Request('https://example.com/api/auth/admin/set-role', {
                 method: 'POST',
@@ -168,13 +176,57 @@ describe('admin plugin', () => {
             { ADMIN_USER_IDS: '' }
         )
         expect(banResponse.status).toBe(200)
+
+        const unbanResponse = await callAsApp(
+            new Request('https://example.com/api/auth/admin/unban-user', {
+                method: 'POST',
+                headers: { cookie: freshManagerCookie, origin: 'https://example.com', 'content-type': 'application/json' },
+                body: JSON.stringify({ userId: targetId })
+            }),
+            { ADMIN_USER_IDS: '' }
+        )
+        expect(unbanResponse.status).toBe(200)
+
+        const removeResponse = await callAsApp(
+            new Request('https://example.com/api/auth/admin/remove-user', {
+                method: 'POST',
+                headers: { cookie: freshManagerCookie, origin: 'https://example.com', 'content-type': 'application/json' },
+                body: JSON.stringify({ userId: targetId })
+            }),
+            { ADMIN_USER_IDS: '' }
+        )
+        expect(removeResponse.status).toBe(200)
+        const { success } = await removeResponse.json<{ success: boolean }>()
+        expect(success).toBe(true)
     })
 
     it('rejects a plain user on every admin endpoint', async ({ expect }) => {
         const cookie = await signInWithGoogle({ sub: 'google-22', email: 'zara@example.com', name: 'Zara' })
-        const response = await callAsApp(new Request('https://example.com/api/auth/admin/list-users?limit=10', { headers: { cookie } }), {
-            ADMIN_USER_IDS: ''
-        })
-        expect(response.status).toBe(403)
+
+        const listResponse = await callAsApp(
+            new Request('https://example.com/api/auth/admin/list-users?limit=10', { headers: { cookie } }),
+            { ADMIN_USER_IDS: '' }
+        )
+        expect(listResponse.status).toBe(403)
+
+        const setRoleResponse = await callAsApp(
+            new Request('https://example.com/api/auth/admin/set-role', {
+                method: 'POST',
+                headers: { cookie, origin: 'https://example.com', 'content-type': 'application/json' },
+                body: JSON.stringify({ userId: 'irrelevant', role: 'manager' })
+            }),
+            { ADMIN_USER_IDS: '' }
+        )
+        expect(setRoleResponse.status).toBe(403)
+
+        const banResponse = await callAsApp(
+            new Request('https://example.com/api/auth/admin/ban-user', {
+                method: 'POST',
+                headers: { cookie, origin: 'https://example.com', 'content-type': 'application/json' },
+                body: JSON.stringify({ userId: 'irrelevant' })
+            }),
+            { ADMIN_USER_IDS: '' }
+        )
+        expect(banResponse.status).toBe(403)
     })
 })
