@@ -62,7 +62,7 @@ export const managerRestrictions = {
     hooks: {
         before: [
             {
-                matcher: context => RESTRICTED_PATHS.has(context.path),
+                matcher: context => typeof context.path === 'string' && RESTRICTED_PATHS.has(context.path),
                 handler: createAuthMiddleware(async ctx => {
                     const session = await sessionFor(ctx)
                     if (!roleList(session?.user.role).includes('manager')) return
