@@ -23,6 +23,14 @@ export function storeToken(token: string) {
     sessionStorage.setItem(TOKEN_STORAGE_KEY, token)
 }
 
+export function clearStoredToken() {
+    try {
+        sessionStorage.removeItem(TOKEN_STORAGE_KEY)
+    } catch {
+        // sessionStorage can throw in a locked-down browser; nothing to recover here.
+    }
+}
+
 export const authClient = createAuthClient({
     plugins: [adminClient({ roles: { admin: clientRole, manager: clientRole, user: clientRole } })],
     fetchOptions: {
