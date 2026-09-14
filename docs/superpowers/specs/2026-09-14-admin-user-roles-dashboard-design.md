@@ -4,24 +4,25 @@
 
 The worker-admin design (`docs/superpowers/specs/2026-09-12-worker-admin-design.md`) shipped `worker-admin` as a bare passthrough proxy with two explicit non-goals: "custom roles/permissions beyond `user`/`admin`" (the role check stayed a boolean) and "admin UI/frontend" (API only, no browser UI, no consumer for it yet). `apps/worker-admin/src` has since been scaffolded with a React 19 + TanStack Router SPA (`feat(admin): scaffold Vite + React frontend`), but it's a placeholder — one route rendering `<h3>Admin</h3>`, no components, no data fetching, no session handling.
 
-This spec picks up both deferred items together: a real three-tier role model (`admin` > `manager` > `user`) with actual permission differences enforced server-side, and the dashboard UI that lets an admin or manager assign roles and manage users. It also becomes the first real consumer of `worker-auth`'s `oauthProvider` plugin, which has existed since the original auth worker design (`docs/superpowers/specs/2026-08-26-auth-worker-design.md`) specifically for "future applications to link in as OAuth clients" but has never had one until now.
+This spec picks up both deferred items together: a real three-tier role model (`admin` > `manager` > `user`) with actual permission differences enforced server-side, and the dashboard UI that lets an admin or manager assign roles and manage users.
+
+An earlier draft of this spec explored making `worker-admin` a direct OAuth client of `worker-auth`'s `oauthProvider` plugin (which has existed since the original auth worker design specifically for "future applications to link in as OAuth clients"). That turned out not to work: the OAuth-provider's issued access token is a differently-formatted JWT, and `worker-auth`'s own `/api/auth/admin/*` endpoints only accept a session presented via the `bearer` plugin's specific HMAC-signed token format (verified against `node_modules/better-auth/dist/plugins/bearer/index.mjs`) — the two don't interoperate, so completing the full authorize/consent/token dance would still leave `worker-admin` without a usable credential. This spec instead uses the bearer-token round-trip mechanism the original worker-admin design already established and tested (`apps/worker-admin/CLAUDE.md`'s "Calling the API directly" section) — sign in on `worker-client`, obtain the session's bearer token, hand it to `worker-admin`.
 
 ## Goals
 
 - Three roles — `admin`, `manager`, `user` — with `admin` holding the most privilege, enforced via Better Auth's access-control mechanism rather than the current boolean admin/not-admin check.
 - `manager` can perform the same user-management actions as `admin` (list, edit role, ban/unban, remove) except: it cannot grant the `admin` role to anyone, and it cannot act on a user who currently holds the `admin` role.
 - A working dashboard in `worker-admin`'s SPA: sign in, see a user list, change a user's role, ban/unban, remove — gated to what the signed-in viewer's own role permits.
-- `worker-admin` signs in against `worker-auth` directly as an OAuth client (via the existing `oauthProvider` plugin), independent of `worker-client` — `worker-auth` remains the single source of truth for identity and role data, `worker-admin` still holds no database of its own.
-- `worker-auth`'s `consentPage` (`/consent`) gets a real implementation for the first time, since this is genuinely the first linked application.
+- A real sign-in flow for `worker-admin` (today it's a manual curl-only workflow) — the browser round-trips through `worker-client`'s existing sign-in to obtain a bearer token, same mechanism already documented and tested, just automated instead of manual. `worker-auth` remains the single source of truth for identity and role data; `worker-admin` still holds no database of its own.
 
 ## Non-goals (explicitly deferred)
 
 - **Per-classroom or resource-level permissions.** The three roles are global, not scoped to a classroom/resource. No `createAccessControl` statements beyond user-management actions.
 - **Audit logging of admin/manager actions.** Not built in this pass; relies on Workers' own observability, same as the prior admin design's deferral.
 - **Pagination/search in the user list.** A flat list is enough for the current user count; add when it stops being enough.
-- **Dynamic/self-service OAuth client registration, or a general "link a new application" UI.** `worker-admin`'s OAuth client is registered once, out of band (a one-time script/manual call to `auth.api.createOAuthClient`), not through a UI other apps could use later.
+- **`worker-auth`'s `oauthProvider` plugin.** Not used by this feature at all (see Context) — its config is untouched, and registering a real linked application through it remains a future follow-up.
 - **Rate limiting beyond Better Auth's defaults.**
-- **Any `worker-client` involvement beyond serving the consent page.** Its existing `/login` route is reused as-is. The one unavoidable exception is `/consent` (see Architecture) — since `baseURL` is pinned to `worker-client`'s origin, that's the only place `worker-auth`'s `consentPage` config can resolve to, so `worker-client` gains exactly one new route for it. No round-trip, no shared bearer-token code, no changes to `worker-client`'s own sign-in flow.
+- **Persistent/long-lived `worker-admin` sessions.** The bearer token lives in `sessionStorage` (cleared when the tab closes) — no refresh-token handling, no "remember me". Signing in again just repeats the round-trip.
 
 ## Architecture
 
@@ -39,19 +40,17 @@ Better Auth's statement/permission model checks what the *actor's* role can do, 
 
 `user.role` stays a plain `text` column (SQLite has no enum) with `defaultValue: 'user'`. Since `set-role` now accepts three values instead of two, validate the incoming value against the three known roles at that call site (the `admin` plugin's own input validation, or a thin Zod check if it doesn't already reject unknown values — confirm against the plugin's behavior at implementation time).
 
-### `worker-admin` as an OAuth client of `worker-auth`
+### Sign-in round-trip (`worker-client` → `worker-admin`)
 
-`worker-admin` registers once as an OAuth client of `worker-auth` (`auth.api.createOAuthClient`, called out-of-band with an authenticated admin session — a one-time setup step, not app code) and gets a `client_id`/`client_secret` plus a declared redirect URI (`<worker-admin-origin>/auth-callback`). The secret is stored as a `wrangler secret` on `worker-admin` (`OAUTH_CLIENT_SECRET` or similar) — it must never reach the browser.
+Purely client-side — no new backend logic in either worker. `worker-client`'s session cookie is what's scoped to its origin, but a bearer token derived from that session is origin-agnostic (the `bearer` plugin resolves it the same way regardless of which worker's `/api/auth/*` passthrough forwards the request), so the token itself is what crosses from one app to the other, carried in a URL fragment (never sent to a server, since fragments aren't part of the HTTP request).
 
-Sign-in flow:
+1. `worker-admin`'s `/login` route renders a "Sign in" button linking to `worker-client`'s `/login?returnTo=<worker-admin-origin>/auth-callback`.
+2. `worker-client`'s `/login` route (`apps/worker-client/src/routes/login.tsx`) gains a `returnTo` search param. Before redirecting anywhere, it validates `returnTo` against a small allowlist of known origins (starts with `worker-admin`'s dev/prod origin) — a bearer token is a live credential, so handing it to an arbitrary attacker-supplied redirect target would be an open-redirect-to-token-leak. If not already signed in, the existing "Sign in with Google" button's `callbackURL` is set to `/login?returnTo=<same value>` so the flow lands back here post-Google-auth.
+3. Once signed in (with a valid `returnTo`), the route makes one authenticated call (`authClient.$fetch('/get-session', { onResponse })`) and reads the `set-auth-token` response header — the same mechanism `apps/worker-admin/CLAUDE.md`'s existing curl workflow and `worker-auth`'s existing bearer-plugin test already rely on — then navigates to `${returnTo}#token=<the token>`.
+4. `worker-admin`'s new `/auth-callback` SPA route (`apps/worker-admin/src/routes/auth-callback.tsx`) reads the token from `location.hash` (never touches the server, so it never appears in a request log), stores it in `sessionStorage`, and redirects to `/`.
+5. The SPA attaches the stored token as `Authorization: Bearer <token>` on every `/api/auth/admin/*` call via the Better Auth client's global `fetchOptions.auth` (`{ type: 'Bearer', token: () => sessionStorage.getItem(...) }`).
 
-1. `worker-admin`'s `/login` route renders a "Sign in" button that navigates the browser to `worker-auth`'s `/api/auth/oauth2/authorize?client_id=...&redirect_uri=<worker-admin-origin>/auth-callback&...` (standard OAuth 2.1 authorization-code request), proxied there the same way `/api/auth/*` already is today.
-2. If the browser has no `worker-auth` session yet, `worker-auth` redirects to its configured `loginPage` (`/login`, still `worker-client`'s existing page — unchanged, reused as-is since `baseURL` already points there) to sign in with Google.
-3. `worker-auth` then redirects to its configured `consentPage` (`/consent`) — **new**, needs an actual page for the first time, implemented as a new route in `worker-client`'s SPA (the only place it can be served, since `consentPage` resolves against `baseURL`, which is `worker-client`'s origin — the same reason `loginPage` already lives there). Approving redirects back to the authorize endpoint, which issues an authorization code and redirects to `worker-admin`'s declared redirect URI.
-4. `worker-admin`'s own backend (`worker/index.ts`, currently a blind `/api/auth/*` passthrough with no other logic) gains one real route: `GET /auth-callback`, which receives the `code`, exchanges it server-to-server for a token via `worker-auth`'s `/api/auth/oauth2/token` (using the stored `client_secret`), and returns the resulting bearer token to the SPA (e.g. as part of the callback page's response, for the SPA to pick up and store — exact hand-off mechanism, e.g. an inline script vs. a redirect with the token in a URL fragment, is an implementation-time detail — the constraint is that the `client_secret` itself never leaves the worker).
-5. The SPA stores the bearer token (`sessionStorage`) and attaches it as `Authorization: Bearer <token>` on every subsequent `/api/auth/admin/*` call.
-
-No code in `worker-client` changes. `worker-admin`'s existing `/api/auth/*` passthrough (`AUTH_SERVICE` binding) is untouched for everything except the new `/auth-callback` route.
+`worker-admin`'s existing `/api/auth/*` passthrough (`AUTH_SERVICE` binding) is untouched.
 
 ### Dashboard UI (`worker-admin` SPA)
 
@@ -63,7 +62,7 @@ No code in `worker-client` changes. `worker-admin`'s existing `/api/auth/*` pass
 
 ## Data model
 
-No new tables. `user.role` (existing `text` column, default `'user'`) now takes three meaningful values instead of two; no schema change, only a widened set of valid application-level values and the new `ac`/`statement` configuration described above. Re-run `npx auth@1.7.1 generate` after changing the `admin` plugin config and diff `schema.ts` before assuming no migration is needed (per `apps/worker-auth/CLAUDE.md`'s existing warning) — the OAuth-client registration for `worker-admin` also lands rows in the `oauthProvider` plugin's existing client-application tables, no new tables needed there either.
+No new tables. `user.role` (existing `text` column, default `'user'`) now takes three meaningful values instead of two; no schema change, only a widened set of valid application-level values and the new `ac`/`statement` configuration described above. Re-run `npx auth@1.7.1 generate` after changing the `admin` plugin config and diff `schema.ts` before assuming no migration is needed (per `apps/worker-auth/CLAUDE.md`'s existing warning).
 
 ## Testing / verification
 
@@ -73,11 +72,9 @@ No new tables. `user.role` (existing `text` column, default `'user'`) now takes 
   3. `manager` gets 403 attempting `set-role`/`ban`/`unban`/`remove` against a user whose current role is `admin`.
   4. `user` gets 403 on every `/api/auth/admin/*` endpoint (unchanged from today).
   5. `admin` (via `ADMIN_USER_IDS` bootstrap or a promoted account) retains full access, including granting `admin` and acting on other admins.
-- **`worker-admin`:** the new `/auth-callback` route is the first real logic this worker has ever had — a focused Vitest test mocking `worker-auth`'s token endpoint (via the existing `AUTH_SERVICE` binding mock pattern) confirms the code-for-token exchange happens server-side and the client secret is never echoed back to the caller.
-- **`worker-client`'s new `/consent` route:** the smallest test/manual-check that approving consent there actually completes the authorize round-trip back to `worker-admin`.
-- **Manual browser check:** the full sign-in → consent → dashboard → role-change flow, once, in a real browser against local `wrangler dev` instances of both workers — this is the first time an OAuth-client round trip between two of this repo's own workers has ever run end-to-end, so it's worth the one manual pass beyond automated coverage.
-- No frontend test runner exists in this repo yet; the dashboard UI itself is verified by the manual browser check above, not automated component tests.
+- **Manual browser check:** the full sign-in round-trip → dashboard → role-change flow, once, in a real browser against local dev servers for both `worker-client` and `worker-admin` — this is the first time the bearer-token hand-off has been automated end-to-end (rather than a developer copy-pasting a token via curl), and the `returnTo` allowlist check is exactly the kind of thing worth eyeballing in a real browser once.
+- No frontend test runner exists in this repo yet for either `worker-client` or `worker-admin`; both the `/login` round-trip changes and the dashboard UI are verified by the manual browser check above, not automated component tests.
 
 ## Versioning
 
-Run `npm run changeset` and select `@capstone/admin` (new UI, new backend logic), `@capstone/auth` (access-control model change, new OAuth client), and `@capstone/client` (new `/consent` route) in the same run, per this repo's rule that a shared/upstream change materially affecting a consumer gets both bumped together.
+Run `npm run changeset` and select `@capstone/admin` (new UI, new sign-in flow), `@capstone/auth` (access-control model change), and `@capstone/client` (new `returnTo` round-trip logic on `/login`) in the same run, per this repo's rule that a shared/upstream change materially affecting a consumer gets both bumped together.
