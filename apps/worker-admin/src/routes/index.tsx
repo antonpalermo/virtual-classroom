@@ -10,6 +10,7 @@ type ManagedUser = {
 }
 
 const ROLE_OPTIONS = ['user', 'manager', 'admin'] as const
+type RoleOption = (typeof ROLE_OPTIONS)[number]
 
 export const Route = createFileRoute('/')({
     beforeLoad: () => {
@@ -45,12 +46,13 @@ function DashboardRoute() {
         )
     }
 
-    async function changeRole(userId: string, role: string) {
+    async function changeRole(userId: string, role: RoleOption) {
         const { error } = await authClient.admin.setRole({ userId, role })
         if (error) {
             setLoadError(error.message ?? 'Failed to change role')
             return
         }
+        setLoadError(null)
         setUsers(current => current?.map(user => (user.id === userId ? { ...user, role } : user)) ?? null)
     }
 
@@ -61,6 +63,7 @@ function DashboardRoute() {
             setLoadError(error.message ?? 'Failed to update ban status')
             return
         }
+        setLoadError(null)
         setUsers(current => current?.map(u => (u.id === user.id ? { ...u, banned: !u.banned } : u)) ?? null)
     }
 
@@ -70,10 +73,11 @@ function DashboardRoute() {
             setLoadError(error.message ?? 'Failed to remove user')
             return
         }
+        setLoadError(null)
         setUsers(current => current?.filter(u => u.id !== userId) ?? null)
     }
 
-    const grantableRoles = viewerRole === 'admin' ? ROLE_OPTIONS : ROLE_OPTIONS.filter(role => role !== 'admin')
+    const grantableRoles: readonly RoleOption[] = viewerRole === 'admin' ? ROLE_OPTIONS : ROLE_OPTIONS.filter(role => role !== 'admin')
 
     return (
         <div className="p-2">
@@ -91,16 +95,18 @@ function DashboardRoute() {
                 <tbody>
                     {users?.map(user => {
                         const lockedForViewer = viewerRole === 'manager' && user.role === 'admin'
+                        const currentRole = (user.role ?? 'user') as RoleOption
+                        const displayedRoles = grantableRoles.includes(currentRole) ? grantableRoles : [...grantableRoles, currentRole]
                         return (
                             <tr key={user.id}>
                                 <td>{user.email}</td>
                                 <td>
                                     <select
-                                        value={user.role ?? 'user'}
+                                        value={currentRole}
                                         disabled={lockedForViewer}
-                                        onChange={event => changeRole(user.id, event.target.value)}
+                                        onChange={event => changeRole(user.id, event.target.value as RoleOption)}
                                     >
-                                        {grantableRoles.map(role => (
+                                        {displayedRoles.map(role => (
                                             <option key={role} value={role}>
                                                 {role}
                                             </option>
