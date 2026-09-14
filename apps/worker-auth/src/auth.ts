@@ -4,6 +4,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin, bearer, jwt } from 'better-auth/plugins'
 import { ac, adminRole, managerRole, userRole } from './access-control'
 import type { Db } from './db/client'
+import { managerRestrictions } from './manager-restrictions'
 
 export function createAuth(db: Db, env: Env) {
     return betterAuth({
@@ -50,6 +51,7 @@ export function createAuth(db: Db, env: Env) {
                         .map(id => id.trim())
                         .filter(Boolean) ?? []
             }),
+            managerRestrictions,
             // Converts an `Authorization: Bearer <token>` header into the same session a cookie
             // would carry, so worker-admin — a separate origin with no cookie of its own, since
             // Google's redirect_uri (and so the session cookie) is pinned to worker-client's

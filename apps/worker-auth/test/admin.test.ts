@@ -230,3 +230,66 @@ describe('admin plugin', () => {
         expect(banResponse.status).toBe(403)
     })
 })
+
+async function setRole(actorCookie: string, targetUserId: string, role: string, adminUserIds = '') {
+    return callAsApp(
+        new Request('https://example.com/api/auth/admin/set-role', {
+            method: 'POST',
+            headers: { cookie: actorCookie, origin: 'https://example.com', 'content-type': 'application/json' },
+            body: JSON.stringify({ userId: targetUserId, role })
+        }),
+        { ADMIN_USER_IDS: adminUserIds }
+    )
+}
+
+it('rejects a manager trying to grant the admin role', async ({ expect }) => {
+    const bootstrapCookie = await signInWithGoogle({ sub: 'google-30', email: 'lena@example.com', name: 'Lena' })
+    const bootstrapId = await userIdForEmail('lena@example.com')
+    await setRole(bootstrapCookie, bootstrapId, 'manager', bootstrapId)
+    const managerCookie = await signInWithGoogle({ sub: 'google-30', email: 'lena@example.com', name: 'Lena' })
+
+    await signInWithGoogle({ sub: 'google-31', email: 'omar2@example.com', name: 'Omar' })
+    const targetId = await userIdForEmail('omar2@example.com')
+
+    const response = await setRole(managerCookie, targetId, 'admin')
+    expect(response.status).toBe(403)
+})
+
+it('rejects a manager acting on a user who is currently admin', async ({ expect }) => {
+    const adminCookie = await signInWithGoogle({ sub: 'google-32', email: 'wei@example.com', name: 'Wei' })
+    const adminId = await userIdForEmail('wei@example.com')
+    // Bootstrap admin status (ADMIN_USER_IDS) is per-request and isn't reflected in the `role`
+    // column, which is the only signal manager-restrictions can check — persist it so wei is
+    // "currently admin" for the later calls below.
+    await setRole(adminCookie, adminId, 'admin', adminId)
+
+    await signInWithGoogle({ sub: 'google-33', email: 'ana@example.com', name: 'Ana' })
+    const managerId = await userIdForEmail('ana@example.com')
+    await setRole(adminCookie, managerId, 'manager', adminId)
+    const freshManagerCookie = await signInWithGoogle({ sub: 'google-33', email: 'ana@example.com', name: 'Ana' })
+
+    const response = await setRole(freshManagerCookie, adminId, 'manager', '')
+    expect(response.status).toBe(403)
+
+    const banResponse = await callAsApp(
+        new Request('https://example.com/api/auth/admin/ban-user', {
+            method: 'POST',
+            headers: { cookie: freshManagerCookie, origin: 'https://example.com', 'content-type': 'application/json' },
+            body: JSON.stringify({ userId: adminId })
+        }),
+        { ADMIN_USER_IDS: '' }
+    )
+    expect(banResponse.status).toBe(403)
+})
+
+it('still lets an admin act on another admin', async ({ expect }) => {
+    const adminCookie = await signInWithGoogle({ sub: 'google-34', email: 'tom@example.com', name: 'Tom' })
+    const adminId = await userIdForEmail('tom@example.com')
+
+    await signInWithGoogle({ sub: 'google-35', email: 'ivy@example.com', name: 'Ivy' })
+    const otherAdminId = await userIdForEmail('ivy@example.com')
+    await setRole(adminCookie, otherAdminId, 'admin', adminId)
+
+    const response = await setRole(adminCookie, otherAdminId, 'manager', adminId)
+    expect(response.status).toBe(200)
+})
