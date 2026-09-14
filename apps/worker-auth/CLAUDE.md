@@ -9,6 +9,8 @@
 - `src/db/client.ts` — `createDb(d1)`, wraps the `AUTH_DB` binding in a Drizzle client.
 - `src/db/schema.ts` — **generated** by `npx auth@latest generate` (see `auth.cli.ts` below), then owned/hand-edited from there. Don't hand-author from scratch; regenerate after adding/changing plugins.
 - `auth.cli.ts` — Node-only shim used solely by the Better Auth CLI to generate `src/db/schema.ts` (the CLI can't see a real D1 binding). Never imported by the Worker itself.
+- `src/access-control.ts` — the `admin` plugin's Better Auth `ac` statement set and its three roles: `adminRole` and `managerRole` (identical statement sets — full parity on `user` and `session` operations) and `userRole` (none). `manager` isn't a separate mechanism from `admin`; it's granted through the same `role` column, just a different string value — see the `admin` plugin config in `src/auth.ts`.
+- `src/manager-restrictions.ts` — a Better Auth plugin (`managerRestrictions`, registered in `src/auth.ts`'s `plugins` array) that 403s a `manager`-role session on `/admin/set-role`, `/admin/ban-user`, `/admin/unban-user`, `/admin/remove-user` when it's trying to grant the `admin` role or act on a user whose *current* role is already `admin`. This exists because `ac` can only check what the actor's role can do, not the target user's state or the requested value — the one piece of manager/admin parity `access-control.ts` can't express on its own.
 - `drizzle.config.ts` / `drizzle/*.sql` — `drizzle-kit`-generated migrations, applied via `wrangler d1 migrations apply AUTH_DB` (uses the `migrations_dir` set in `wrangler.jsonc`).
 - `worker-configuration.d.ts` — **generated** by `wrangler types`; don't Read it in full — `grep` for the specific binding/type you need.
 
