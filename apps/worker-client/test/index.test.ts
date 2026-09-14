@@ -13,6 +13,15 @@ it('appends the bearer token as a fragment when the callback redirect carries a 
     )
 })
 
+it('does not append the bearer token when returnTo is not an allowlisted origin', async ({ expect }) => {
+    const ctx = createExecutionContext()
+    const response = await app.fetch(new Request('https://example.com/api/auth/callback/google?code=evil&state=evil'), env, ctx)
+    await waitOnExecutionContext(ctx)
+
+    // Relayed as-is: same redirect target, no `#token=` fragment minted for the attacker's origin.
+    expect(response.headers.get('location')).toBe('https://example.com/login?returnTo=https%3A%2F%2Fattacker.example%2Fsteal')
+})
+
 it('leaves the callback redirect untouched when there is no returnTo param', async ({ expect }) => {
     const ctx = createExecutionContext()
     const response = await app.fetch(new Request('https://example.com/api/auth/callback/google?code=plain&state=plain'), env, ctx)

@@ -1,3 +1,15 @@
+// Same allowlist as src/routes/login.tsx's ALLOWED_RETURN_ORIGINS — duplicated rather than
+// shared because src/ and worker/ are separate build targets with separate tsconfigs. A bearer
+// token is a live credential, so the mint has to fail closed here too: the client-side check in
+// login.tsx stays as defence in depth, but it can't be the only gate, since this rewrite is what
+// puts the token on the wire in the first place.
+const ALLOWED_RETURN_ORIGINS = ['http://localhost:8790']
+
+function isAllowedReturnTo(returnTo: string | null) {
+    if (!returnTo) return false
+    return ALLOWED_RETURN_ORIGINS.some(origin => returnTo === origin || returnTo.startsWith(`${origin}/`))
+}
+
 export default {
     async fetch(request, env) {
         const url = new URL(request.url)
@@ -13,7 +25,7 @@ export default {
                 const location = response.headers.get('location')
                 if (token && location) {
                     const redirectUrl = new URL(location, url.origin)
-                    if (redirectUrl.searchParams.has('returnTo')) {
+                    if (isAllowedReturnTo(redirectUrl.searchParams.get('returnTo'))) {
                         redirectUrl.hash = `token=${encodeURIComponent(token)}`
                         const headers = new Headers(response.headers)
                         headers.set('location', redirectUrl.toString())
