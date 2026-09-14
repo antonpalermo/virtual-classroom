@@ -27,11 +27,13 @@ export const adminRole = ac.newRole({
     session: ['list', 'revoke', 'delete']
 })
 
-// Same action set as admin at the ac layer — the "manager can't touch admin accounts or grant
-// the admin role" restriction is target-state-aware and can't be expressed here. See
-// manager-restrictions.ts.
+// Identical statement set to adminRole — the "manager can't touch admin accounts or grant the
+// admin role" restriction is target-state-aware (it depends on the record being acted on, not
+// just the action name) and can't be expressed as a narrower ac statement here. It's enforced by
+// a hook instead. See manager-restrictions.ts.
 export const managerRole = ac.newRole({
-    user: ['list', 'set-role', 'ban', 'delete']
+    user: ['create', 'list', 'set-role', 'ban', 'impersonate', 'delete', 'set-password', 'set-email', 'get', 'update'],
+    session: ['list', 'revoke', 'delete']
 })
 
 export const userRole = ac.newRole({
