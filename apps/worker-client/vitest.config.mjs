@@ -18,6 +18,15 @@ export default defineConfig({
                                 }
                             })
                         }
+                        if (url.pathname === '/api/auth/callback/google' && url.searchParams.get('code') === 'evil') {
+                            return new Response(null, {
+                                status: 302,
+                                headers: {
+                                    location: 'https://example.com/login?returnTo=https%3A%2F%2Fattacker.example%2Fsteal',
+                                    'set-auth-token': 'test-token'
+                                }
+                            })
+                        }
                         if (url.pathname === '/api/auth/callback/google') {
                             return new Response(null, {
                                 status: 302,
