@@ -201,3 +201,6 @@ out
 
 # Tanstack Router
 .tanstack
+
+# Git worktrees (superpowers:using-git-worktrees)
+.worktrees
