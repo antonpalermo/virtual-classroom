@@ -7,7 +7,11 @@ beforeAll(() => googleNetwork.enable())
 afterEach(() => googleNetwork.resetHandlers())
 afterAll(() => googleNetwork.disable())
 
-async function signInWithGoogle(profile: { sub: string; email: string; name: string }) {
+// The bearer plugin only mints a `set-auth-token` header on a response that itself sets a *new*
+// session cookie (its `after` hook, in node_modules/better-auth/dist/plugins/bearer/index.mjs,
+// reads `responseHeaders.get('set-cookie')` and bails if absent) — so the token has to be read
+// off the sign-in callback response itself, not a later get-session call.
+async function googleSignIn(profile: { sub: string; email: string; name: string }) {
     mockGoogleAccount(profile)
 
     const authorizeResponse = await callAsApp(
@@ -33,7 +37,17 @@ async function signInWithGoogle(profile: { sub: string; email: string; name: str
         .find(entry => entry.includes('session_token'))
         ?.split(';')[0]
     if (!cookie) throw new Error('expected a session cookie from sign-in')
-    return cookie
+    return { cookie, token: signInResponse.headers.get('set-auth-token') }
+}
+
+async function signInWithGoogle(profile: { sub: string; email: string; name: string }) {
+    return (await googleSignIn(profile)).cookie
+}
+
+async function signInForBearerToken(profile: { sub: string; email: string; name: string }) {
+    const { token } = await googleSignIn(profile)
+    if (!token) throw new Error('expected a set-auth-token header from the bearer plugin')
+    return token
 }
 
 async function userIdForEmail(email: string) {
@@ -94,36 +108,7 @@ describe('admin plugin', () => {
     })
 
     it('accepts a session presented as a bearer token instead of a cookie', async ({ expect }) => {
-        mockGoogleAccount({ sub: 'google-14', email: 'theo@example.com', name: 'Theo' })
-
-        const authorizeResponse = await callAsApp(
-            new Request('https://example.com/api/auth/sign-in/social', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ provider: 'google', callbackURL: 'https://example.com/' })
-            })
-        )
-        const { url } = await authorizeResponse.json<{ url: string }>()
-        if (!url) throw new Error('expected an authorize URL from /api/auth/sign-in/social')
-        const state = new URL(url).searchParams.get('state')
-        const stateCookie = authorizeResponse.headers.get('set-cookie')?.split(';')[0]
-        if (!stateCookie) throw new Error('expected a state cookie from /api/auth/sign-in/social')
-
-        // The bearer plugin only mints a `set-auth-token` header on a response that itself sets
-        // a *new* session cookie (its `after` hook, in
-        // node_modules/better-auth/dist/plugins/bearer/index.mjs, reads
-        // `responseHeaders.get('set-cookie')` and bails if absent) — a plain get-session call on
-        // an already-fresh session doesn't reissue the cookie, so the token has to be read off
-        // the sign-in callback response itself, not a later get-session call (confirmed by
-        // instrumenting both responses: the callback carries `set-auth-token`, a follow-up
-        // get-session doesn't).
-        const signInResponse = await callAsApp(
-            new Request(`https://example.com/api/auth/callback/google?code=test-code&state=${state}`, {
-                headers: { cookie: stateCookie }
-            })
-        )
-        const token = signInResponse.headers.get('set-auth-token')
-        if (!token) throw new Error('expected a set-auth-token header from the bearer plugin')
+        const token = await signInForBearerToken({ sub: 'google-14', email: 'theo@example.com', name: 'Theo' })
 
         const bearerResponse = await callAsApp(
             new Request('https://example.com/api/auth/get-session', { headers: { authorization: `Bearer ${token}` } })
@@ -292,4 +277,134 @@ it('still lets an admin act on another admin', async ({ expect }) => {
 
     const response = await setRole(adminCookie, otherAdminId, 'manager', adminId)
     expect(response.status).toBe(200)
+})
+
+// worker-admin authenticates exclusively by bearer token, never a cookie. `runBeforeHooks`
+// (node_modules/better-auth/dist/api/dispatch.mjs) hands every `hooks.before` entry the same
+// unmodified context and only merges returned headers after the loop, so `bearer()`'s
+// header→cookie conversion is invisible to manager-restrictions' own hook — these cases all
+// passed unrestricted until manager-restrictions ran bearer's conversion itself.
+describe('manager restrictions over bearer auth', () => {
+    function adminPost(path: string, token: string, body: unknown, adminUserIds = '') {
+        return callAsApp(
+            new Request(`https://example.com/api/auth/admin/${path}`, {
+                method: 'POST',
+                headers: { authorization: `Bearer ${token}`, origin: 'https://example.com', 'content-type': 'application/json' },
+                body: JSON.stringify(body)
+            }),
+            { ADMIN_USER_IDS: adminUserIds }
+        )
+    }
+
+    // Promotes `profile` to `role` using its own bootstrap admin rights, then re-signs-in so the
+    // returned token belongs to a session whose row already carries the new role.
+    async function bearerTokenForRole(profile: { sub: string; email: string; name: string }, role: string) {
+        await signInForBearerToken(profile)
+        const userId = await userIdForEmail(profile.email)
+        const bootstrapToken = await signInForBearerToken(profile)
+        const promote = await adminPost('set-role', bootstrapToken, { userId, role }, userId)
+        if (promote.status !== 200) throw new Error(`failed to promote ${profile.email} to ${role}: ${promote.status}`)
+        return { token: await signInForBearerToken(profile), userId }
+    }
+
+    it('rejects a manager granting the admin role via set-role', async ({ expect }) => {
+        const { token } = await bearerTokenForRole({ sub: 'google-40', email: 'bea@example.com', name: 'Bea' }, 'manager')
+        await signInWithGoogle({ sub: 'google-41', email: 'cal@example.com', name: 'Cal' })
+        const targetId = await userIdForEmail('cal@example.com')
+
+        const response = await adminPost('set-role', token, { userId: targetId, role: 'admin' })
+        expect(response.status).toBe(403)
+    })
+
+    it('rejects a manager granting the admin role as a single-element array', async ({ expect }) => {
+        const { token } = await bearerTokenForRole({ sub: 'google-42', email: 'dev@example.com', name: 'Dev' }, 'manager')
+        await signInWithGoogle({ sub: 'google-43', email: 'eve@example.com', name: 'Eve' })
+        const targetId = await userIdForEmail('eve@example.com')
+
+        const response = await adminPost('set-role', token, { userId: targetId, role: ['admin'] })
+        expect(response.status).toBe(403)
+    })
+
+    it('rejects a manager acting on an admin target via ban-user', async ({ expect }) => {
+        const { token: adminToken } = await bearerTokenForRole({ sub: 'google-44', email: 'fay@example.com', name: 'Fay' }, 'admin')
+        const adminId = await userIdForEmail('fay@example.com')
+        await signInWithGoogle({ sub: 'google-45', email: 'gus@example.com', name: 'Gus' })
+        const managerId = await userIdForEmail('gus@example.com')
+        expect((await adminPost('set-role', adminToken, { userId: managerId, role: 'manager' })).status).toBe(200)
+        const managerToken = await signInForBearerToken({ sub: 'google-45', email: 'gus@example.com', name: 'Gus' })
+
+        const response = await adminPost('ban-user', managerToken, { userId: adminId })
+        expect(response.status).toBe(403)
+    })
+
+    it('keeps a manager restricted after self-assigning a comma-joined role', async ({ expect }) => {
+        const { token, userId } = await bearerTokenForRole({ sub: 'google-46', email: 'hal@example.com', name: 'Hal' }, 'manager')
+        await signInWithGoogle({ sub: 'google-47', email: 'ivy2@example.com', name: 'Ivy' })
+        const targetId = await userIdForEmail('ivy2@example.com')
+
+        // `parseRoles` (node_modules/better-auth/dist/plugins/admin/routes.mjs) persists this as
+        // the literal string 'manager,user', which `hasPermission` still authorizes as a manager
+        // by splitting on ','. A `role === 'manager'` actor check would stop matching here and
+        // wave every later request through.
+        const selfPromote = await adminPost('set-role', token, { userId, role: ['manager', 'user'] })
+        expect(selfPromote.status).toBe(200)
+        const { results } = await env.AUTH_DB.prepare('SELECT role FROM user WHERE id = ?').bind(userId).all<{ role: string }>()
+        expect(results[0]?.role).toBe('manager,user')
+
+        const freshToken = await signInForBearerToken({ sub: 'google-46', email: 'hal@example.com', name: 'Hal' })
+        const response = await adminPost('set-role', freshToken, { userId: targetId, role: 'admin' })
+        expect(response.status).toBe(403)
+    })
+
+    it('rejects a manager granting the admin role via update-user', async ({ expect }) => {
+        const { token } = await bearerTokenForRole({ sub: 'google-48', email: 'jon@example.com', name: 'Jon' }, 'manager')
+        await signInWithGoogle({ sub: 'google-49', email: 'kim@example.com', name: 'Kim' })
+        const targetId = await userIdForEmail('kim@example.com')
+
+        const response = await adminPost('update-user', token, { userId: targetId, data: { role: 'admin' } })
+        expect(response.status).toBe(403)
+    })
+
+    it('rejects a manager creating a brand-new admin via create-user', async ({ expect }) => {
+        const { token } = await bearerTokenForRole({ sub: 'google-50', email: 'lou@example.com', name: 'Lou' }, 'manager')
+
+        const response = await adminPost('create-user', token, { email: 'newadmin@example.com', name: 'New', role: 'admin' })
+        expect(response.status).toBe(403)
+    })
+
+    it('leaves a real admin unaffected on every restricted endpoint over bearer auth', async ({ expect }) => {
+        const { token } = await bearerTokenForRole({ sub: 'google-51', email: 'mac@example.com', name: 'Mac' }, 'admin')
+        await signInWithGoogle({ sub: 'google-52', email: 'nia@example.com', name: 'Nia' })
+        const targetId = await userIdForEmail('nia@example.com')
+
+        // ADMIN_USER_IDS stays empty: these must pass on the persisted `role` column alone.
+        expect((await adminPost('set-role', token, { userId: targetId, role: 'admin' })).status).toBe(200)
+        expect((await adminPost('update-user', token, { userId: targetId, data: { role: 'admin' } })).status).toBe(200)
+        expect((await adminPost('ban-user', token, { userId: targetId })).status).toBe(200)
+        expect((await adminPost('unban-user', token, { userId: targetId })).status).toBe(200)
+        expect((await adminPost('create-user', token, { email: 'madeadmin@example.com', name: 'Made', role: 'admin' })).status).toBe(200)
+        expect((await adminPost('remove-user', token, { userId: targetId })).status).toBe(200)
+    })
+})
+
+// manager-restrictions' hook populates `ctx.context.session`, which the endpoint's own session
+// lookup then reuses — so its bearer conversion must be no more permissive than bearer()'s.
+// A token whose HMAC signature doesn't check out must still authenticate nobody: `getSignedCookie`
+// (node_modules/better-call/dist/context.mjs) verifies the signature when the cookie is read
+// back, which is what makes reusing bearer()'s own handler safe here.
+it('does not authenticate a bearer token with a forged signature', async ({ expect }) => {
+    const token = await signInForBearerToken({ sub: 'google-53', email: 'oli@example.com', name: 'Oli' })
+    const userId = await userIdForEmail('oli@example.com')
+    const [value] = decodeURIComponent(token).split('.')
+    const forged = encodeURIComponent(`${value}.${'A'.repeat(43)}=`)
+
+    const response = await callAsApp(
+        new Request('https://example.com/api/auth/admin/set-role', {
+            method: 'POST',
+            headers: { authorization: `Bearer ${forged}`, origin: 'https://example.com', 'content-type': 'application/json' },
+            body: JSON.stringify({ userId, role: 'admin' })
+        }),
+        { ADMIN_USER_IDS: '' }
+    )
+    expect(response.status).toBe(401)
 })
