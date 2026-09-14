@@ -9,7 +9,9 @@
         "lint": "biome check .",
         "preview": "npm run build && vite preview",
         "deploy": "npm run build && wrangler deploy",
-        "cf-typegen": "wrangler types"
+        "cf-typegen": "wrangler types",
+        "test": "vitest",
+        "test:run": "vitest run"
     },
     "dependencies": {
         "@tanstack/react-router": "^1.170.31",
@@ -20,6 +22,8 @@
     },
     "devDependencies": {
         "@cloudflare/vite-plugin": "^1.53.0",
+        "@cloudflare/vitest-pool-workers": "^0.22.0",
+        "@cloudflare/workers-types": "^5.20260826.1",
         "@tanstack/router-plugin": "^1.168.34",
         "@types/node": "^24.13.3",
         "@types/react": "^19.2.17",
@@ -27,6 +31,7 @@
         "@vitejs/plugin-react": "^6.0.4",
         "typescript": "~6.0.2",
         "vite": "^8.2.0",
+        "vitest": "^4.1.11",
         "wrangler": "^4.124.0"
     }
 }
