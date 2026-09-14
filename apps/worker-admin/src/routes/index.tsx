@@ -1,6 +1,6 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { authClient, getStoredToken } from '../lib/auth-client'
+import { authClient, clearStoredToken, getStoredToken } from '../lib/auth-client'
 
 type ManagedUser = {
     id: string
@@ -20,14 +20,26 @@ export const Route = createFileRoute('/')({
 })
 
 function DashboardRoute() {
-    const { data: session } = authClient.useSession()
+    // `beforeLoad` only proves a token *string* is in sessionStorage, not that it still works.
+    // So three states have to stay distinct: still resolving, resolved-but-no-session (the stored
+    // token is expired/invalid — drop it and go back to /login rather than stranding the user on
+    // a permanent "Access denied"), and resolved with a real `user`-role session.
+    const { data: session, isPending } = authClient.useSession()
+    const navigate = useNavigate()
     const [users, setUsers] = useState<ManagedUser[] | null>(null)
     const [loadError, setLoadError] = useState<string | null>(null)
 
     const viewerRole = session?.user.role ?? 'user'
+    const tokenIsStale = !isPending && !session
 
     useEffect(() => {
-        if (viewerRole === 'user') return
+        if (!tokenIsStale) return
+        clearStoredToken()
+        navigate({ to: '/login' })
+    }, [tokenIsStale, navigate])
+
+    useEffect(() => {
+        if (isPending || !session || viewerRole === 'user') return
         authClient.admin.listUsers({ query: { limit: 100 } }).then(({ data, error }) => {
             if (error) {
                 setLoadError(error.message ?? 'Failed to load users')
@@ -35,7 +47,10 @@ function DashboardRoute() {
             }
             setUsers((data?.users as ManagedUser[]) ?? [])
         })
-    }, [viewerRole])
+    }, [isPending, session, viewerRole])
+
+    if (isPending) return <p className="p-2">Loading…</p>
+    if (tokenIsStale) return <p className="p-2">Your session has expired. Redirecting to sign in…</p>
 
     if (viewerRole === 'user') {
         return (
