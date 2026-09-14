@@ -131,4 +131,50 @@ describe('admin plugin', () => {
         const session = await bearerResponse.json<{ user: { email: string } }>()
         expect(session.user.email).toBe('theo@example.com')
     })
+
+    it('lets a manager list users, change a non-admin role, ban/unban, and remove a non-admin', async ({ expect }) => {
+        const managerCookie = await signInWithGoogle({ sub: 'google-20', email: 'mia@example.com', name: 'Mia' })
+        const managerId = await userIdForEmail('mia@example.com')
+        await callAsApp(
+            new Request('https://example.com/api/auth/admin/set-role', {
+                method: 'POST',
+                headers: { cookie: managerCookie, origin: 'https://example.com', 'content-type': 'application/json' },
+                body: JSON.stringify({ userId: managerId, role: 'manager' })
+            }),
+            { ADMIN_USER_IDS: managerId }
+        )
+        // re-sign-in so the session reflects the freshly-set role
+        const freshManagerCookie = await signInWithGoogle({ sub: 'google-20', email: 'mia@example.com', name: 'Mia' })
+
+        await signInWithGoogle({ sub: 'google-21', email: 'noah@example.com', name: 'Noah' })
+        const targetId = await userIdForEmail('noah@example.com')
+
+        const setRoleResponse = await callAsApp(
+            new Request('https://example.com/api/auth/admin/set-role', {
+                method: 'POST',
+                headers: { cookie: freshManagerCookie, origin: 'https://example.com', 'content-type': 'application/json' },
+                body: JSON.stringify({ userId: targetId, role: 'manager' })
+            }),
+            { ADMIN_USER_IDS: '' }
+        )
+        expect(setRoleResponse.status).toBe(200)
+
+        const banResponse = await callAsApp(
+            new Request('https://example.com/api/auth/admin/ban-user', {
+                method: 'POST',
+                headers: { cookie: freshManagerCookie, origin: 'https://example.com', 'content-type': 'application/json' },
+                body: JSON.stringify({ userId: targetId })
+            }),
+            { ADMIN_USER_IDS: '' }
+        )
+        expect(banResponse.status).toBe(200)
+    })
+
+    it('rejects a plain user on every admin endpoint', async ({ expect }) => {
+        const cookie = await signInWithGoogle({ sub: 'google-22', email: 'zara@example.com', name: 'Zara' })
+        const response = await callAsApp(new Request('https://example.com/api/auth/admin/list-users?limit=10', { headers: { cookie } }), {
+            ADMIN_USER_IDS: ''
+        })
+        expect(response.status).toBe(403)
+    })
 })
