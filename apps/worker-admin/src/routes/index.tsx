@@ -3,7 +3,7 @@ import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { authClient, clearStoredJwt, clearStoredSession, getStoredJwt } from '../lib/auth-client'
 
-const JWKS_URL = 'http://localhost:8789/api/auth/jwks'
+const JWKS_URL = `${import.meta.env.VITE_AUTH_ORIGIN ?? 'http://localhost:8789'}/api/auth/jwks`
 
 type ManagedUser = {
     id: string

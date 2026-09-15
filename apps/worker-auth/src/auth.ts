@@ -3,6 +3,7 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { admin, bearer, jwt } from 'better-auth/plugins'
 import { ac, adminRole, managerRole, userRole } from './access-control'
+import { parseAllowedReturnOrigins } from './allowed-return-origins'
 import type { Db } from './db/client'
 import { managerRestrictions } from './manager-restrictions'
 
@@ -28,10 +29,11 @@ export function createAuth(db: Db, env: Env) {
             }
         },
         // 'https://example.com' matches the origin the test suite's synthetic requests use.
-        // 'http://localhost:8790' and 'http://localhost:5173' are worker-admin's and
-        // worker-client's fixed local dev origins — neither has a cookie of its own on this
-        // worker, but both call /api/auth/* directly now that BETTER_AUTH_URL points here.
-        trustedOrigins: [env.BETTER_AUTH_URL, 'https://example.com', 'http://localhost:8790', 'http://localhost:5173'],
+        // The rest come from ALLOWED_RETURN_ORIGINS — the same allowlist hosted login enforces
+        // for its `returnTo` param (worker-admin's and worker-client's origins) — since neither
+        // has a cookie of its own on this worker, but both call /api/auth/* directly now that
+        // BETTER_AUTH_URL points here.
+        trustedOrigins: [env.BETTER_AUTH_URL, 'https://example.com', ...parseAllowedReturnOrigins(env)],
         plugins: [
             jwt({
                 jwt: {

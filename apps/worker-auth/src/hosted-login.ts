@@ -1,30 +1,19 @@
-import type { Hono } from 'hono'
+import type { Context, Hono } from 'hono'
+import { getCookie } from 'hono/cookie'
+import { isAllowedReturnTo, parseAllowedReturnOrigins } from './allowed-return-origins'
 import { createAuth } from './auth'
 import { createDb } from './db/client'
-
-function parseAllowedReturnOrigins(env: Env): string[] {
-    return (
-        env.ALLOWED_RETURN_ORIGINS?.split(',')
-            .map(origin => origin.trim())
-            .filter(Boolean) ?? []
-    )
-}
-
-function isAllowedReturnTo(returnTo: string, allowedOrigins: string[]): boolean {
-    return allowedOrigins.some(origin => returnTo === origin || returnTo.startsWith(`${origin}/`))
-}
 
 // Better Auth's bearer plugin treats the session cookie's own value as the bearer token
 // (node_modules/better-auth/dist/plugins/bearer/index.mjs: `const token = sessionCookie.value`),
 // so the value to relay forward comes straight off this request's own Cookie header rather than
-// a query param an attacker could substitute their own token into (session fixation).
-function extractSessionToken(cookieHeader: string | undefined): string | undefined {
-    const entry = cookieHeader
-        ?.split(';')
-        .map(part => part.trim())
-        .find(part => part.includes('session_token'))
-    if (!entry) return undefined
-    return entry.slice(entry.indexOf('=') + 1)
+// a query param an attacker could substitute their own token into (session fixation). Matched by
+// exact cookie name (via Hono's own cookie parser) rather than a substring match — a substring
+// match would accept any cookie whose name *or value* happens to contain "session_token",
+// including one an attacker plants on a sibling subdomain, reopening the same session-fixation
+// class of bug fixed above.
+function extractSessionToken(c: Context): string | undefined {
+    return getCookie(c, 'better-auth.session_token') ?? getCookie(c, '__Secure-better-auth.session_token')
 }
 
 function loginPage(completeUrl: string): string {
@@ -45,6 +34,10 @@ document.getElementById('google-sign-in').addEventListener('click', async () => 
         body: JSON.stringify({ provider: 'google', callbackURL: ${JSON.stringify(completeUrl)} })
     })
     const { url } = await response.json()
+    if (!url) {
+        alert('Sign-in failed, please try again.')
+        return
+    }
     window.location.href = url
 })
 </script>
@@ -70,8 +63,7 @@ export function registerHostedLogin(app: Hono<{ Bindings: Env }>) {
             return c.text('Unrecognized returnTo', 400)
         }
 
-        const cookieHeader = c.req.header('cookie')
-        const sessionToken = extractSessionToken(cookieHeader)
+        const sessionToken = extractSessionToken(c)
         if (!sessionToken) {
             return c.text('Unable to establish session', 401)
         }
@@ -80,13 +72,16 @@ export function registerHostedLogin(app: Hono<{ Bindings: Env }>) {
         const auth = createAuth(db, c.env)
         const tokenResponse = await auth.handler(
             new Request(new URL('/api/auth/token', c.req.url), {
-                headers: { cookie: cookieHeader ?? '' }
+                headers: { cookie: c.req.header('cookie') ?? '' }
             })
         )
         if (!tokenResponse.ok) {
             return c.text('Unable to establish session', 401)
         }
         const { token: jwt } = await tokenResponse.json<{ token: string }>()
+        if (!jwt || typeof jwt !== 'string') {
+            return c.text('Unable to establish session', 401)
+        }
 
         const redirectUrl = new URL(returnTo)
         redirectUrl.hash = `token=${encodeURIComponent(jwt)}&session=${encodeURIComponent(sessionToken)}`

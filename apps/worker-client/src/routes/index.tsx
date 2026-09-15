@@ -1,9 +1,10 @@
 import { type AccessTokenClaims, verifyAccessToken } from '@capstone/auth-verify'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { clearStoredSession, getStoredToken } from '../lib/session'
+import { clearStoredSession, getStoredSession, getStoredToken } from '../lib/session'
 
-const JWKS_URL = 'http://localhost:8789/api/auth/jwks'
+const AUTH_ORIGIN = import.meta.env.VITE_AUTH_ORIGIN ?? 'http://localhost:8789'
+const JWKS_URL = `${AUTH_ORIGIN}/api/auth/jwks`
 
 export const Route = createFileRoute('/')({
     component: HomeRoute
@@ -30,6 +31,14 @@ function HomeRoute() {
     }
 
     function signOut() {
+        const session = getStoredSession()
+        // Best-effort: local sign-out must always succeed even if this fails, so it's not awaited.
+        if (session) {
+            fetch(`${AUTH_ORIGIN}/api/auth/sign-out`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${session}` }
+            }).catch(() => {})
+        }
         clearStoredSession()
         setClaims(null)
     }

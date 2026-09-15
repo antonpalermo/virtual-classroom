@@ -23,7 +23,11 @@ export function getStoredSession() {
 }
 
 export function storeSession(session: string) {
-    sessionStorage.setItem(SESSION_STORAGE_KEY, session)
+    try {
+        sessionStorage.setItem(SESSION_STORAGE_KEY, session)
+    } catch {
+        // sessionStorage can throw in a locked-down browser; nothing to recover here.
+    }
 }
 
 export function clearStoredSession() {
@@ -43,7 +47,11 @@ export function getStoredJwt() {
 }
 
 export function storeJwt(jwt: string) {
-    sessionStorage.setItem(JWT_STORAGE_KEY, jwt)
+    try {
+        sessionStorage.setItem(JWT_STORAGE_KEY, jwt)
+    } catch {
+        // sessionStorage can throw in a locked-down browser; nothing to recover here.
+    }
 }
 
 export function clearStoredJwt() {

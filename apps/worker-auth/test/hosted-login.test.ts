@@ -65,7 +65,10 @@ describe('GET /login/complete', () => {
             .find(entry => entry.includes('session_token'))
             ?.split(';')[0]
         expect(sessionCookie).toBeTruthy()
-        const sessionCookieValue = sessionCookie?.slice(sessionCookie.indexOf('=') + 1)
+        // The Set-Cookie header carries the token URL-encoded; /login/complete now reads it back
+        // via Hono's getCookie, which decodes it — so the value relayed forward on the fragment
+        // is the decoded (raw) token, not the cookie's URL-encoded wire form.
+        const sessionCookieValue = decodeURIComponent(sessionCookie?.slice(sessionCookie.indexOf('=') + 1) ?? '')
 
         const completeUrl = new URL(callbackResponse.headers.get('location') ?? '', 'https://example.com')
 
@@ -81,11 +84,21 @@ describe('GET /login/complete', () => {
         const params = new URLSearchParams(fragment)
         const jwt = params.get('token')
         expect(jwt).toBeTruthy()
-        expect(params.get('session')).toBe(sessionCookieValue)
+        const session = params.get('session')
+        expect(session).toBe(sessionCookieValue)
 
         const claims = decodeJwt(jwt ?? '')
         expect(claims.email).toBe(profile.email)
         expect(claims.role).toBe('user')
+
+        // The relayed `session` value is only useful to worker-admin if it actually works as a
+        // bearer credential — prove that here rather than just asserting it matches the cookie.
+        const bearerResponse = await callAsApp(
+            new Request('https://example.com/api/auth/admin/list-users', {
+                headers: { authorization: `Bearer ${session}` }
+            })
+        )
+        expect(bearerResponse.status).not.toBe(401)
     })
 
     it('rejects a returnTo that is not on the allowlist', async () => {

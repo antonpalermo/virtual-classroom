@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 // worker-auth's own hosted login page — this app no longer performs Google sign-in itself.
-const AUTH_ORIGIN = 'http://localhost:8789'
+const AUTH_ORIGIN = import.meta.env.VITE_AUTH_ORIGIN ?? 'http://localhost:8789'
 
 export const Route = createFileRoute('/login')({
     component: LoginRoute
