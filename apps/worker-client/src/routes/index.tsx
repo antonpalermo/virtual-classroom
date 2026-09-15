@@ -1,5 +1,9 @@
+import { type AccessTokenClaims, verifyAccessToken } from '@capstone/auth-verify'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { authClient } from '../lib/auth-client'
+import { useEffect, useState } from 'react'
+import { clearStoredSession, getStoredToken } from '../lib/session'
+
+const JWKS_URL = 'http://localhost:8789/api/auth/jwks'
 
 export const Route = createFileRoute('/')({
     component: HomeRoute
@@ -7,21 +11,37 @@ export const Route = createFileRoute('/')({
 
 function HomeRoute() {
     const navigate = useNavigate()
-    const { data: session, isPending } = authClient.useSession()
+    const [claims, setClaims] = useState<AccessTokenClaims | null | undefined>(undefined)
+
+    useEffect(() => {
+        const token = getStoredToken()
+        if (!token) {
+            setClaims(null)
+            return
+        }
+        verifyAccessToken(token, JWKS_URL).then(setClaims)
+    }, [])
+
+    const isPending = claims === undefined
 
     function createRoom() {
         const id = crypto.randomUUID()
         navigate({ from: '/', to: '/room', search: { id } })
     }
 
+    function signOut() {
+        clearStoredSession()
+        setClaims(null)
+    }
+
     return (
         <div className="p-2">
             <h3>Welcome!</h3>
             {!isPending &&
-                (session ? (
+                (claims ? (
                     <p>
-                        Signed in as {session.user.email}{' '}
-                        <button type="button" onClick={() => authClient.signOut()}>
+                        Signed in as {claims.email}{' '}
+                        <button type="button" onClick={signOut}>
                             Sign out
                         </button>
                     </p>
