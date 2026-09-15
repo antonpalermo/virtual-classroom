@@ -28,12 +28,18 @@ export function createAuth(db: Db, env: Env) {
             }
         },
         // 'https://example.com' matches the origin the test suite's synthetic requests use.
-        // 'http://localhost:8790' is worker-admin's fixed local dev port
-        // (apps/worker-admin/wrangler.jsonc) — its calls proxy through here and need to pass
-        // Better Auth's origin check.
-        trustedOrigins: [env.BETTER_AUTH_URL, 'https://example.com', 'http://localhost:8790'],
+        // 'http://localhost:8790' and 'http://localhost:5173' are worker-admin's and
+        // worker-client's fixed local dev origins — neither has a cookie of its own on this
+        // worker, but both call /api/auth/* directly now that BETTER_AUTH_URL points here.
+        trustedOrigins: [env.BETTER_AUTH_URL, 'https://example.com', 'http://localhost:8790', 'http://localhost:5173'],
         plugins: [
-            jwt(),
+            jwt({
+                jwt: {
+                    // Keep the token minimal — just what worker-client/worker-admin need for
+                    // local role/identity checks, not the whole user row.
+                    definePayload: ({ user }) => ({ email: user.email, role: user.role })
+                }
+            }),
             oauthProvider({
                 loginPage: '/login',
                 consentPage: '/consent'
