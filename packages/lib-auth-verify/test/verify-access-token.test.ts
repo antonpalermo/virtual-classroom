@@ -33,6 +33,10 @@ async function signToken(claims: Record<string, unknown>, expiresIn = '15m') {
         .sign(privateKey)
 }
 
+async function signTokenWithoutExp(claims: Record<string, unknown>) {
+    return new SignJWT(claims).setProtectedHeader({ alg: 'EdDSA', kid: 'test-key' }).setIssuedAt().sign(privateKey)
+}
+
 describe('verifyAccessToken', () => {
     it('returns claims for a valid token', async () => {
         const token = await signToken({ sub: 'user-1', email: 'a@example.com', role: 'admin' })
@@ -64,6 +68,12 @@ describe('verifyAccessToken', () => {
 
     it('returns null when the role claim is missing', async () => {
         const token = await signToken({ sub: 'user-1', email: 'a@example.com' })
+        const result = await verifyAccessToken(token, JWKS_URL)
+        expect(result).toBeNull()
+    })
+
+    it('returns null when the exp claim is missing', async () => {
+        const token = await signTokenWithoutExp({ sub: 'user-1', email: 'a@example.com', role: 'admin' })
         const result = await verifyAccessToken(token, JWKS_URL)
         expect(result).toBeNull()
     })

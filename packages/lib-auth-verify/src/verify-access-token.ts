@@ -22,11 +22,13 @@ function getJwks(jwksUrl: string) {
 
 export async function verifyAccessToken(token: string, jwksUrl: string): Promise<AccessTokenClaims | null> {
     try {
-        const { payload } = await jwtVerify(token, getJwks(jwksUrl))
+        const { payload } = await jwtVerify(token, getJwks(jwksUrl), {
+            requiredClaims: ['exp', 'sub', 'email', 'role']
+        })
         if (typeof payload.sub !== 'string' || typeof payload.email !== 'string' || typeof payload.role !== 'string') {
             return null
         }
-        return { sub: payload.sub, email: payload.email, role: payload.role, exp: payload.exp ?? 0 }
+        return { sub: payload.sub, email: payload.email, role: payload.role, exp: payload.exp as number }
     } catch {
         return null
     }
