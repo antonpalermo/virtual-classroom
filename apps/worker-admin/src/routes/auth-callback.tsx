@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { storeToken } from '../lib/auth-client'
+import { storeJwt, storeSession } from '../lib/auth-client'
 
 export const Route = createFileRoute('/auth-callback')({
     component: AuthCallbackRoute
@@ -10,12 +10,15 @@ function AuthCallbackRoute() {
     const navigate = useNavigate()
 
     useEffect(() => {
-        const match = window.location.hash.match(/^#token=(.+)$/)
-        if (!match) {
+        const params = new URLSearchParams(window.location.hash.slice(1))
+        const token = params.get('token')
+        const session = params.get('session')
+        if (!token || !session) {
             navigate({ to: '/login' })
             return
         }
-        storeToken(decodeURIComponent(match[1]))
+        storeJwt(token)
+        storeSession(session)
         navigate({ to: '/' })
     }, [navigate])
 

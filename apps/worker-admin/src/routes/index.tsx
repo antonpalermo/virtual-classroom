@@ -1,6 +1,9 @@
+import { type AccessTokenClaims, verifyAccessToken } from '@capstone/auth-verify'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { authClient, clearStoredToken, getStoredToken } from '../lib/auth-client'
+import { authClient, clearStoredJwt, clearStoredSession, getStoredJwt } from '../lib/auth-client'
+
+const JWKS_URL = 'http://localhost:8789/api/auth/jwks'
 
 type ManagedUser = {
     id: string
@@ -14,32 +17,40 @@ type RoleOption = (typeof ROLE_OPTIONS)[number]
 
 export const Route = createFileRoute('/')({
     beforeLoad: () => {
-        if (!getStoredToken()) throw redirect({ to: '/login' })
+        if (!getStoredJwt()) throw redirect({ to: '/login' })
     },
     component: DashboardRoute
 })
 
 function DashboardRoute() {
-    // `beforeLoad` only proves a token *string* is in sessionStorage, not that it still works.
-    // So three states have to stay distinct: still resolving, resolved-but-no-session (the stored
-    // token is expired/invalid — drop it and go back to /login rather than stranding the user on
-    // a permanent "Access denied"), and resolved with a real `user`-role session.
-    const { data: session, isPending } = authClient.useSession()
+    // `beforeLoad` only proves a token *string* is in sessionStorage, not that it still verifies.
+    // So three states have to stay distinct: still resolving, resolved-but-invalid (the stored
+    // JWT is expired/malformed — drop it and go back to /login rather than stranding the user on
+    // a permanent "Access denied"), and resolved with real claims.
+    const [claims, setClaims] = useState<AccessTokenClaims | null | undefined>(undefined)
     const navigate = useNavigate()
     const [users, setUsers] = useState<ManagedUser[] | null>(null)
     const [loadError, setLoadError] = useState<string | null>(null)
 
-    const viewerRole = session?.user.role ?? 'user'
-    const tokenIsStale = !isPending && !session
+    useEffect(() => {
+        const jwt = getStoredJwt()
+        if (!jwt) return
+        verifyAccessToken(jwt, JWKS_URL).then(setClaims)
+    }, [])
+
+    const isPending = claims === undefined
+    const tokenIsStale = !isPending && !claims
+    const viewerRole = claims?.role ?? 'user'
 
     useEffect(() => {
         if (!tokenIsStale) return
-        clearStoredToken()
+        clearStoredJwt()
+        clearStoredSession()
         navigate({ to: '/login' })
     }, [tokenIsStale, navigate])
 
     useEffect(() => {
-        if (isPending || !session || viewerRole === 'user') return
+        if (isPending || !claims || viewerRole === 'user') return
         authClient.admin.listUsers({ query: { limit: 100 } }).then(({ data, error }) => {
             if (error) {
                 setLoadError(error.message ?? 'Failed to load users')
@@ -47,7 +58,7 @@ function DashboardRoute() {
             }
             setUsers((data?.users as ManagedUser[]) ?? [])
         })
-    }, [isPending, session, viewerRole])
+    }, [isPending, claims, viewerRole])
 
     if (isPending) return <p className="p-2">Loading…</p>
     if (tokenIsStale) return <p className="p-2">Your session has expired. Redirecting to sign in…</p>
