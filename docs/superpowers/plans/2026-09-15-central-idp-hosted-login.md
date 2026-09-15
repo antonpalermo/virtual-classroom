@@ -24,18 +24,18 @@
 ## Task 1: `@capstone/auth-verify` package — `verifyAccessToken`
 
 **Files:**
-- Create: `packages/auth-verify/package.json`
-- Create: `packages/auth-verify/tsconfig.json`
-- Create: `packages/auth-verify/vitest.config.mjs`
-- Create: `packages/auth-verify/src/verify-access-token.ts`
-- Test: `packages/auth-verify/test/verify-access-token.test.ts`
+- Create: `packages/lib-auth-verify/package.json`
+- Create: `packages/lib-auth-verify/tsconfig.json`
+- Create: `packages/lib-auth-verify/vitest.config.mjs`
+- Create: `packages/lib-auth-verify/src/verify-access-token.ts`
+- Test: `packages/lib-auth-verify/test/verify-access-token.test.ts`
 
 **Interfaces:**
 - Produces: `verifyAccessToken(token: string, jwksUrl: string): Promise<AccessTokenClaims | null>` and `export interface AccessTokenClaims { sub: string; email: string; role: string; exp: number }`, both exported from `@capstone/auth-verify` (package root export). Tasks 4 and 5 import both.
 
 - [ ] **Step 1: Scaffold the package**
 
-Create `packages/auth-verify/package.json`:
+Create `packages/lib-auth-verify/package.json`:
 
 ```json
 {
@@ -64,7 +64,7 @@ Create `packages/auth-verify/package.json`:
 }
 ```
 
-Create `packages/auth-verify/tsconfig.json`:
+Create `packages/lib-auth-verify/tsconfig.json`:
 
 ```json
 {
@@ -77,7 +77,7 @@ Create `packages/auth-verify/tsconfig.json`:
 }
 ```
 
-Create `packages/auth-verify/vitest.config.mjs`:
+Create `packages/lib-auth-verify/vitest.config.mjs`:
 
 ```js
 import { defineConfig } from 'vitest/config'
@@ -92,7 +92,7 @@ Expected: the new workspace is linked (`node_modules/@capstone/auth-verify` syml
 
 - [ ] **Step 3: Write the failing tests**
 
-Create `packages/auth-verify/test/verify-access-token.test.ts`:
+Create `packages/lib-auth-verify/test/verify-access-token.test.ts`:
 
 ```ts
 import { generateKeyPair, exportJWK, SignJWT } from 'jose'
@@ -170,7 +170,7 @@ Expected: FAIL — `Cannot find module '../src/verify-access-token'` (the file d
 
 - [ ] **Step 5: Implement `verifyAccessToken`**
 
-Create `packages/auth-verify/src/verify-access-token.ts`:
+Create `packages/lib-auth-verify/src/verify-access-token.ts`:
 
 ```ts
 import { createRemoteJWKSet, jwtVerify } from 'jose'
@@ -218,7 +218,7 @@ Expected: PASS, 5/5 tests.
 Run: `npm run lint --filter=@capstone/auth-verify`
 
 ```bash
-git add packages/auth-verify
+git add packages/lib-auth-verify
 git commit -m "$(cat <<'EOF'
 feat(auth-verify): add verifyAccessToken JWT verification helper
 
