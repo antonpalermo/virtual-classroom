@@ -4,7 +4,8 @@
 
 ## Layout
 
-- `src/index.ts` — Hono app. Serves a trivial `/` health route and mounts Better Auth's handler at `/api/auth/*`.
+- `src/index.ts` — Hono app. Serves a trivial `/` health route, opens CORS on `/api/auth/jwks` (fetched cross-origin straight from worker-client's/worker-admin's browser JS), mounts the hosted login routes (`registerHostedLogin`), and mounts Better Auth's handler at `/api/auth/*` — with one interception: on `/api/auth/callback/google`'s redirect response, it copies the `set-auth-token` bearer session token onto the redirect's `location` as a `session` query param, so `/login/complete` (which only sees the redirect, not the original response headers) can carry it forward.
+- `src/hosted-login.ts` — `registerHostedLogin(app)`, mounting `GET /login` (renders a minimal Google sign-in page, gated on an allowlisted `returnTo` query param) and `GET /login/complete` (mints a JWT via `/api/auth/token` and 302-redirects to `returnTo` with `#token=<jwt>&session=<bearer token>` on the URL fragment). Both routes reject a `returnTo` not matching `env.ALLOWED_RETURN_ORIGINS` with a 400.
 - `src/auth.ts` — `createAuth(db, env)`, the Better Auth factory (Google social provider, `role` additional field, `jwt` + `oauthProvider` + `admin` + `bearer` plugins). Built as a factory rather than a module-level singleton because the D1 binding only exists inside a request's `env`.
 - `src/db/client.ts` — `createDb(d1)`, wraps the `AUTH_DB` binding in a Drizzle client.
 - `src/db/schema.ts` — **generated** by `npx auth@latest generate` (see `auth.cli.ts` below), then owned/hand-edited from there. Don't hand-author from scratch; regenerate after adding/changing plugins.
@@ -27,7 +28,7 @@ npx drizzle-kit generate
 
 `@cloudflare/vitest-pool-workers` runs tests inside the real Workers runtime against a real local D1 (migrations applied automatically via `test/apply-migrations.ts`). Tests call the app via `test/helpers/call-app.ts` (`callAsApp`). Outbound calls to Google are mocked with `@msw/cloudflare` (`test/helpers/google-network.ts`) so the full sign-in/callback path runs deterministically without a real Google account. Run: `npm test` (watch) or `npm run test:run` (single run).
 
-One thing the automated suite can't cover: an actual round trip through Google's real consent screen. That's a manual, one-time check via `wrangler dev` with a real Google Cloud OAuth client — see the auth worker design spec's Testing section. Note that in local dev, `.dev.vars`' `BETTER_AUTH_URL` is set to `worker-client`'s origin (`http://localhost:5173`), not this worker's own — Better Auth derives both the Google `redirect_uri` and the session cookie's scope from `baseURL`, and requests only reach this worker proxied through `worker-client`'s service binding, so `worker-client`'s dev server needs to be running too for this manual check to work.
+One thing the automated suite can't cover: an actual round trip through Google's real consent screen. That's a manual, one-time check via `wrangler dev` with a real Google Cloud OAuth client — see the auth worker design spec's Testing section. `.dev.vars`' `BETTER_AUTH_URL` now points at this worker's own origin (`http://localhost:8789`), not worker-client's — Better Auth derives both the Google `redirect_uri` and the session cookie's scope from `baseURL`, and worker-auth serves its own `/login` directly (see `src/hosted-login.ts`), so this manual check no longer requires worker-client's dev server to be running: point a browser at `http://localhost:8789/login?returnTo=<an origin in ALLOWED_RETURN_ORIGINS>` directly.
 
 ## Commands (run from this directory, or via `npm run <script> -w @capstone/auth` from root)
 
@@ -40,4 +41,4 @@ One thing the automated suite can't cover: an actual round trip through Google's
 
 `worker-client` talks to this worker via a Cloudflare service binding (`AUTH_SERVICE` in `apps/worker-client/wrangler.jsonc`), proxying `/api/auth/*` requests through — see [docs/superpowers/specs/2026-08-27-client-auth-wiring-design.md](../../docs/superpowers/specs/2026-08-27-client-auth-wiring-design.md). `worker-admin` talks to this worker the same way (its own `AUTH_SERVICE` binding) and additionally relies on the `admin` and `bearer` plugins configured here — see [apps/worker-admin/CLAUDE.md](../worker-admin/CLAUDE.md) and [docs/superpowers/specs/2026-09-12-worker-admin-design.md](../../docs/superpowers/specs/2026-09-12-worker-admin-design.md). `worker-realtime` is not wired up yet. See the [auth worker design spec](../../docs/superpowers/specs/2026-08-26-auth-worker-design.md) for what's still deferred (additional identity providers, custom domain) and the worker-admin spec for the roles/permissions/admin-UI follow-up.
 
-`BETTER_AUTH_URL` is set to `worker-client`'s origin, not this worker's own — see the Testing section above.
+`BETTER_AUTH_URL` is set to this worker's own origin — see the Testing section above.
