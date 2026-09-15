@@ -14,24 +14,10 @@ app.use('/api/auth/jwks', cors())
 
 registerHostedLogin(app)
 
-app.all('/api/auth/*', async c => {
+app.all('/api/auth/*', c => {
     const db = createDb(c.env.AUTH_DB)
     const auth = createAuth(db, c.env)
-    const response = await auth.handler(c.req.raw)
-
-    if (new URL(c.req.url).pathname === '/api/auth/callback/google') {
-        const sessionToken = response.headers.get('set-auth-token')
-        const location = response.headers.get('location')
-        if (sessionToken && location) {
-            const redirectUrl = new URL(location, c.req.url)
-            redirectUrl.searchParams.set('session', sessionToken)
-            const headers = new Headers(response.headers)
-            headers.set('location', redirectUrl.toString())
-            return new Response(response.body, { status: response.status, headers })
-        }
-    }
-
-    return response
+    return auth.handler(c.req.raw)
 })
 
 export default app

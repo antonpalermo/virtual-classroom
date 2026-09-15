@@ -54,14 +54,18 @@ describe('GET /login/complete', () => {
         const profile = { sub: 'google-1', email: 'user@example.com', name: 'Test User' }
         const callbackResponse = await completeGoogleSignIn(profile, `/login/complete?returnTo=${encodeURIComponent(RETURN_TO)}`)
 
-        const sessionToken = callbackResponse.headers.get('set-auth-token')
-        expect(sessionToken).toBeTruthy()
+        // Better Auth's bearer plugin only mints `set-auth-token` alongside a *new* session
+        // cookie (see the comment in test/admin.test.ts), and its value is literally the
+        // session cookie's own value — asserted below via sessionCookieValue rather than this
+        // header, since /login/complete now reads the token straight off the Cookie header.
+        expect(callbackResponse.headers.get('set-auth-token')).toBeTruthy()
 
         const sessionCookie = callbackResponse.headers
             .getSetCookie()
             .find(entry => entry.includes('session_token'))
             ?.split(';')[0]
         expect(sessionCookie).toBeTruthy()
+        const sessionCookieValue = sessionCookie?.slice(sessionCookie.indexOf('=') + 1)
 
         const completeUrl = new URL(callbackResponse.headers.get('location') ?? '', 'https://example.com')
 
@@ -77,7 +81,7 @@ describe('GET /login/complete', () => {
         const params = new URLSearchParams(fragment)
         const jwt = params.get('token')
         expect(jwt).toBeTruthy()
-        expect(params.get('session')).toBe(sessionToken)
+        expect(params.get('session')).toBe(sessionCookieValue)
 
         const claims = decodeJwt(jwt ?? '')
         expect(claims.email).toBe(profile.email)
@@ -90,5 +94,12 @@ describe('GET /login/complete', () => {
             { ALLOWED_RETURN_ORIGINS: RETURN_ORIGIN }
         )
         expect(response.status).toBe(400)
+    })
+
+    it('rejects an allowlisted returnTo with no session cookie', async () => {
+        const response = await callAsApp(new Request(`https://example.com/login/complete?returnTo=${encodeURIComponent(RETURN_TO)}`), {
+            ALLOWED_RETURN_ORIGINS: RETURN_ORIGIN
+        })
+        expect(response.status).toBe(401)
     })
 })
