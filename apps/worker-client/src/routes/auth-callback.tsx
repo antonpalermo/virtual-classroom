@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { storeJwt, storeSession } from '../lib/auth-client'
+import { storeSession } from '../lib/session'
 
 export const Route = createFileRoute('/auth-callback')({
     component: AuthCallbackRoute
@@ -17,8 +17,7 @@ function AuthCallbackRoute() {
             navigate({ to: '/login' })
             return
         }
-        storeJwt(token)
-        storeSession(session)
+        storeSession({ token, session })
         navigate({ to: '/' })
     }, [navigate])
 

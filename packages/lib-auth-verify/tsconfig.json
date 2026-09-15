@@ -1,0 +1,9 @@
+{
+    "extends": "@capstone/typescript/configs/tsconfig.lib.json",
+    "compilerOptions": {
+        "outDir": "./dist",
+        "lib": ["es2024", "dom"]
+    },
+    "include": ["src"],
+    "exclude": ["dist", "node_modules"]
+}

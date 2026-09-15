@@ -6,7 +6,7 @@ Each workspace has its own `CLAUDE.md` with details specific to it — read that
 
 ## Project overview
 
-A virtual classroom / video conferencing app built entirely on Cloudflare Workers. It's an early-stage Turborepo monorepo (npm workspaces) with four deployable apps and two shared packages:
+A virtual classroom / video conferencing app built entirely on Cloudflare Workers. It's an early-stage Turborepo monorepo (npm workspaces) with four deployable apps and three shared packages:
 
 - `apps/worker-client` (`@capstone/client`) — the frontend. See [apps/worker-client/CLAUDE.md](apps/worker-client/CLAUDE.md).
 - `apps/worker-realtime` (`@capstone/realtime`) — the realtime signaling backend (`Messenger` Durable Object). See [apps/worker-realtime/CLAUDE.md](apps/worker-realtime/CLAUDE.md).
@@ -14,6 +14,7 @@ A virtual classroom / video conferencing app built entirely on Cloudflare Worker
 - `apps/worker-admin` (`@capstone/admin`) — the admin worker: user management and role assignment, proxied through to `worker-auth`. See [apps/worker-admin/CLAUDE.md](apps/worker-admin/CLAUDE.md).
 - `packages/web-standards` (`@capstone/standards`) — generated HTTP status code/phrase constants. See [packages/web-standards/CLAUDE.md](packages/web-standards/CLAUDE.md).
 - `packages/config-typescript` (`@capstone/typescript`) — shared base `tsconfig` files. See [packages/config-typescript/CLAUDE.md](packages/config-typescript/CLAUDE.md).
+- `packages/lib-auth-verify` (`@capstone/auth-verify`) — verifies a worker-auth-issued JWT against its JWKS endpoint; consumed by `worker-client` and `worker-admin`. See [packages/lib-auth-verify/CLAUDE.md](packages/lib-auth-verify/CLAUDE.md).
 
 The four apps are independent Cloudflare Workers deployed separately. `worker-client` and `worker-admin` each talk to `worker-auth` via their own service binding (`AUTH_SERVICE`, proxying `/api/auth/*`) — see [apps/worker-client/CLAUDE.md](apps/worker-client/CLAUDE.md), [apps/worker-admin/CLAUDE.md](apps/worker-admin/CLAUDE.md), and [apps/worker-auth/CLAUDE.md](apps/worker-auth/CLAUDE.md). `worker-realtime` has no service bindings yet.
 

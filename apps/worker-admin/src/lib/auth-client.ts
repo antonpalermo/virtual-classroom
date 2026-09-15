@@ -9,23 +9,54 @@ import { createAuthClient } from 'better-auth/react'
 const clientAc = createAccessControl({})
 const clientRole = clientAc.newRole({})
 
-const TOKEN_STORAGE_KEY = 'admin_token'
+// Better Auth's own opaque session token — used only to call /api/auth/admin/* (setRole/ban/etc).
+const SESSION_STORAGE_KEY = 'admin_session'
+// The signed access token from worker-auth's hosted login — used only for local role/identity checks.
+const JWT_STORAGE_KEY = 'admin_jwt'
 
-export function getStoredToken() {
+export function getStoredSession() {
     try {
-        return sessionStorage.getItem(TOKEN_STORAGE_KEY) ?? undefined
+        return sessionStorage.getItem(SESSION_STORAGE_KEY) ?? undefined
     } catch {
         return undefined
     }
 }
 
-export function storeToken(token: string) {
-    sessionStorage.setItem(TOKEN_STORAGE_KEY, token)
+export function storeSession(session: string) {
+    try {
+        sessionStorage.setItem(SESSION_STORAGE_KEY, session)
+    } catch {
+        // sessionStorage can throw in a locked-down browser; nothing to recover here.
+    }
 }
 
-export function clearStoredToken() {
+export function clearStoredSession() {
     try {
-        sessionStorage.removeItem(TOKEN_STORAGE_KEY)
+        sessionStorage.removeItem(SESSION_STORAGE_KEY)
+    } catch {
+        // sessionStorage can throw in a locked-down browser; nothing to recover here.
+    }
+}
+
+export function getStoredJwt() {
+    try {
+        return sessionStorage.getItem(JWT_STORAGE_KEY) ?? undefined
+    } catch {
+        return undefined
+    }
+}
+
+export function storeJwt(jwt: string) {
+    try {
+        sessionStorage.setItem(JWT_STORAGE_KEY, jwt)
+    } catch {
+        // sessionStorage can throw in a locked-down browser; nothing to recover here.
+    }
+}
+
+export function clearStoredJwt() {
+    try {
+        sessionStorage.removeItem(JWT_STORAGE_KEY)
     } catch {
         // sessionStorage can throw in a locked-down browser; nothing to recover here.
     }
@@ -36,7 +67,7 @@ export const authClient = createAuthClient({
     fetchOptions: {
         auth: {
             type: 'Bearer',
-            token: getStoredToken
+            token: getStoredSession
         }
     }
 })
