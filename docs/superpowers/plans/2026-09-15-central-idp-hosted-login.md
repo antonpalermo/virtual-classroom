@@ -296,8 +296,10 @@ Expected: PASS — these are config-only changes; no existing test asserts the o
 
 - [ ] **Step 5: Commit**
 
+`apps/worker-auth/.dev.vars` is gitignored (local secrets) — edit it locally so tests can run, but never stage or commit it. Only `.dev.vars.example` is tracked.
+
 ```bash
-git add apps/worker-auth/src/auth.ts apps/worker-auth/.dev.vars apps/worker-auth/.dev.vars.example apps/worker-auth/worker-configuration.d.ts
+git add apps/worker-auth/src/auth.ts apps/worker-auth/.dev.vars.example apps/worker-auth/worker-configuration.d.ts
 git commit -m "$(cat <<'EOF'
 feat(auth): point BETTER_AUTH_URL at worker-auth's own origin
 
