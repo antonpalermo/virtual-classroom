@@ -17,7 +17,9 @@
     },
     "exports": {
         ".": {
-            "types": "./src/verify-access-token.ts"
+            "types": "./src/verify-access-token.ts",
+            "import": "./src/verify-access-token.ts",
+            "default": "./src/verify-access-token.ts"
         }
     },
     "license": "MIT"
