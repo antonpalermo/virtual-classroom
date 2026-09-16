@@ -1,11 +1,11 @@
 # CLAUDE.md — worker-oidc
 
-`@capstone/openid-connect` — Better Auth basics: email/password sign-in backed by D1 via Drizzle. No social providers, no OAuth/OIDC-provider plugins yet — this is scaffolding, not `worker-auth`'s identity worker.
+`@capstone/openid-connect` — email/password sign-in backed by D1 via Drizzle, plus Better Auth's `oauthProvider` plugin (from `@better-auth/oauth-provider`) so this worker serves a real OIDC provider (`/.well-known/openid-configuration`, `/api/auth/oauth2/{authorize,token,userinfo,introspect,revoke,end-session}`, `/api/auth/jwks`). No clients are registered yet — `oauth_client` is empty, and nothing here builds `/login` or `/consent` pages (see below).
 
 ## Layout
 
 - `src/index.ts` — Hono app. Serves a trivial `/` health route and mounts Better Auth's handler at `/api/auth/*` unmodified.
-- `src/auth.ts` — `createAuth(db, env)`, the Better Auth factory: Drizzle/D1 adapter, `emailAndPassword` enabled, nothing else. Built as a factory rather than a module-level singleton because the D1 binding only exists inside a request's `env`.
+- `src/auth.ts` — `createAuth(db, env)`, the Better Auth factory: Drizzle/D1 adapter, `emailAndPassword` enabled, `jwt()` + `oauthProvider({ loginPage: '/login', consentPage: '/consent' })` plugins. `jwt()` is a hard dependency of `oauthProvider` (it signs OIDC `id_token`s; omitting it throws `BetterAuthError("jwt_config")` at request time), not an optional pairing. `loginPage`/`consentPage` are required plugin config but don't correspond to real routes yet — nothing triggers `/oauth2/authorize` without a registered client, so there's no interactive flow to serve those pages for. Built as a factory rather than a module-level singleton because the D1 binding only exists inside a request's `env`.
 - `src/db/client.ts` — `createDb(d1)`, wraps the `OIDC_DB` binding in a Drizzle client.
 - `src/db/schema.ts` — **generated** by `npx auth@latest generate` (see `auth.cli.ts` below), then owned/hand-edited from there. Don't hand-author from scratch; regenerate after adding/changing plugins.
 - `auth.cli.ts` — Node-only shim used solely by the Better Auth CLI to generate `src/db/schema.ts` (the CLI can't see a real D1 binding). Never imported by the Worker itself.
@@ -14,7 +14,7 @@
 
 ## Regenerating the schema after a config change
 
-Same version-drift caveat as `worker-auth` (see [apps/worker-auth/CLAUDE.md](../worker-auth/CLAUDE.md)): pin the `auth@latest` CLI's version to this workspace's `better-auth` version and review the generated diff before running `drizzle-kit generate`.
+`auth@latest` can resolve to a version bundling a newer, schema-incompatible `@better-auth/core` than this workspace's pinned `better-auth@^1.7.1` — pin the CLI version to match and review the generated diff (`git diff src/db/schema.ts`, expecting only additive changes) before running `drizzle-kit generate`.
 
 ```bash
 npx auth@1.7.1 generate --config ./auth.cli.ts --adapter drizzle --dialect sqlite --output src/db/schema.ts -y
@@ -30,4 +30,8 @@ npx drizzle-kit generate
 
 `.dev.vars.example` lists the required local vars (`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`); copy it to `.dev.vars` (gitignored) and fill in a real secret before running `dev`. Run `npm run migrations:auth` before first use.
 
-No test suite yet — unlike `worker-auth`, there's no `@cloudflare/vitest-pool-workers` setup here. Add one if/when this grows real logic worth covering.
+No test suite yet — there's no `@cloudflare/vitest-pool-workers` setup here. Add one if/when this grows real logic worth covering.
+
+## Connecting a client (not done yet)
+
+`oauthProvider`'s client management endpoints (`/api/auth/oauth2/client/*`) are live but nothing has registered a client. Registering one will need a real `/login` and `/consent` page (currently just config strings, see `src/auth.ts` above) before the authorize flow can complete end to end.
