@@ -16,6 +16,9 @@
         "typegen": {
             "dependsOn": ["^typegen"]
         },
+        "test:run": {
+            "dependsOn": ["^build"]
+        },
         "dev": {
             "cache": false,
             "persistent": true

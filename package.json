@@ -6,6 +6,7 @@
         "dev": "turbo run dev",
         "lint": "turbo run lint",
         "typegen": "turbo run typegen",
+        "test": "turbo run test:run",
         "format": "biome format --write",
         "check-types": "turbo run check-types",
         "prepare": "husky",
