@@ -1,8 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-// worker-client's dev origin — the one place the sign-in round-trip starts (see
-// docs/superpowers/specs/2026-09-14-admin-user-roles-dashboard-design.md).
-const CLIENT_ORIGIN = 'http://localhost:5173'
+// worker-auth's own hosted login page — this app no longer routes through worker-client at all.
+const AUTH_ORIGIN = import.meta.env.VITE_AUTH_ORIGIN ?? 'http://localhost:8789'
 
 export const Route = createFileRoute('/login')({
     component: LoginRoute
@@ -10,7 +9,7 @@ export const Route = createFileRoute('/login')({
 
 function LoginRoute() {
     const returnTo = `${window.location.origin}/auth-callback`
-    const signInUrl = `${CLIENT_ORIGIN}/login?returnTo=${encodeURIComponent(returnTo)}`
+    const signInUrl = `${AUTH_ORIGIN}/login?returnTo=${encodeURIComponent(returnTo)}`
 
     return (
         <div className="p-2">

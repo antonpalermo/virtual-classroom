@@ -3,53 +3,24 @@ import { env } from 'cloudflare:workers'
 import { it } from 'vitest'
 import app from '../worker/index'
 
-it('appends the bearer token as a fragment when the callback redirect carries a returnTo param', async ({ expect }) => {
+it('forwards /api/auth/* requests to the AUTH_SERVICE binding', async ({ expect }) => {
     const ctx = createExecutionContext()
-    const response = await app.fetch(new Request('https://example.com/api/auth/callback/google?code=test&state=test'), env, ctx)
-    await waitOnExecutionContext(ctx)
-
-    expect(response.headers.get('location')).toBe(
-        'https://example.com/login?returnTo=http%3A%2F%2Flocalhost%3A8790%2Fauth-callback#token=test-token'
+    const response = await app.fetch(
+        new Request('https://example.com/api/auth/get-session', { headers: { authorization: 'Bearer test-token' } }),
+        env,
+        ctx
     )
-})
-
-it('does not append the bearer token when returnTo is not an allowlisted origin', async ({ expect }) => {
-    const ctx = createExecutionContext()
-    const response = await app.fetch(new Request('https://example.com/api/auth/callback/google?code=evil&state=evil'), env, ctx)
-    await waitOnExecutionContext(ctx)
-
-    // Relayed as-is: same redirect target, no `#token=` fragment minted for the attacker's origin.
-    expect(response.headers.get('location')).toBe('https://example.com/login?returnTo=https%3A%2F%2Fattacker.example%2Fsteal')
-})
-
-it('leaves the callback redirect untouched when there is no returnTo param', async ({ expect }) => {
-    const ctx = createExecutionContext()
-    const response = await app.fetch(new Request('https://example.com/api/auth/callback/google?code=plain&state=plain'), env, ctx)
-    await waitOnExecutionContext(ctx)
-
-    expect(response.headers.get('location')).toBe('https://example.com/')
-})
-
-it('relays a non-callback redirect byte-for-byte, without rewriting it', async ({ expect }) => {
-    const ctx = createExecutionContext()
-    const response = await app.fetch(new Request('https://example.com/api/auth/some-other-redirect'), env, ctx)
-    await waitOnExecutionContext(ctx)
-
-    expect(response.status).toBe(302)
-    expect(response.headers.get('location')).toBe('https://example.com/elsewhere')
-})
-
-it('forwards other /api/auth/* requests untouched', async ({ expect }) => {
-    const ctx = createExecutionContext()
-    const response = await app.fetch(new Request('https://example.com/api/auth/get-session'), env, ctx)
     await waitOnExecutionContext(ctx)
 
     expect(response.status).toBe(200)
+    const body = await response.json<{ url: string; authorization: string | null }>()
+    expect(body.url).toBe('https://example.com/api/auth/get-session')
+    expect(body.authorization).toBe('Bearer test-token')
 })
 
 it('404s any request outside /api/auth/*', async ({ expect }) => {
     const ctx = createExecutionContext()
-    const response = await app.fetch(new Request('https://example.com/whatever'), env, ctx)
+    const response = await app.fetch(new Request('https://example.com/api/admin/whatever'), env, ctx)
     await waitOnExecutionContext(ctx)
 
     expect(response.status).toBe(404)

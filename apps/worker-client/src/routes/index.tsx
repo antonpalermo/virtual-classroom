@@ -1,5 +1,10 @@
+import { type AccessTokenClaims, verifyAccessToken } from '@capstone/auth-verify'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { authClient } from '../lib/auth-client'
+import { useEffect, useState } from 'react'
+import { clearStoredSession, getStoredSession, getStoredToken } from '../lib/session'
+
+const AUTH_ORIGIN = import.meta.env.VITE_AUTH_ORIGIN ?? 'http://localhost:8789'
+const JWKS_URL = `${AUTH_ORIGIN}/api/auth/jwks`
 
 export const Route = createFileRoute('/')({
     component: HomeRoute
@@ -7,21 +12,45 @@ export const Route = createFileRoute('/')({
 
 function HomeRoute() {
     const navigate = useNavigate()
-    const { data: session, isPending } = authClient.useSession()
+    const [claims, setClaims] = useState<AccessTokenClaims | null | undefined>(undefined)
+
+    useEffect(() => {
+        const token = getStoredToken()
+        if (!token) {
+            setClaims(null)
+            return
+        }
+        verifyAccessToken(token, JWKS_URL).then(setClaims)
+    }, [])
+
+    const isPending = claims === undefined
 
     function createRoom() {
         const id = crypto.randomUUID()
         navigate({ from: '/', to: '/room', search: { id } })
     }
 
+    function signOut() {
+        const session = getStoredSession()
+        // Best-effort: local sign-out must always succeed even if this fails, so it's not awaited.
+        if (session) {
+            fetch(`${AUTH_ORIGIN}/api/auth/sign-out`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${session}` }
+            }).catch(() => {})
+        }
+        clearStoredSession()
+        setClaims(null)
+    }
+
     return (
         <div className="p-2">
             <h3>Welcome!</h3>
             {!isPending &&
-                (session ? (
+                (claims ? (
                     <p>
-                        Signed in as {session.user.email}{' '}
-                        <button type="button" onClick={() => authClient.signOut()}>
+                        Signed in as {claims.email}{' '}
+                        <button type="button" onClick={signOut}>
                             Sign out
                         </button>
                     </p>

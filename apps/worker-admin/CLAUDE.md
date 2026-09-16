@@ -7,7 +7,7 @@ A React 19 + TanStack Router SPA (built with Vite, served by the Worker as stati
 ## Layout
 
 - `worker/index.ts` — the whole backend: a bare `ExportedHandler` that forwards any `/api/auth/*` request to `AUTH_SERVICE` (a service binding to `worker-auth`) and 404s everything else. Byte-for-byte the same shape as `apps/worker-client/worker/index.ts`'s passthrough.
-- `src/` — the frontend SPA. `src/main.tsx` entry point, `src/lib/auth-client.ts` (the `better-auth/react` client, configured with the `adminClient()` plugin and a global bearer-token `fetchOptions.auth` reading from `sessionStorage`; exports `authClient`, `getStoredToken`, `storeToken`), `src/routes/` file-based routes (`__root.tsx`, `login.tsx`, `auth-callback.tsx`, `index.tsx` — the dashboard), `src/routeTree.gen.ts` **generated** by the TanStack Router Vite plugin from `src/routes/` — don't hand-edit, let the dev server regenerate it.
+- `src/` — the frontend SPA. `src/main.tsx` entry point, `src/lib/auth-client.ts` (the `better-auth/react` client, configured with the `adminClient()` plugin and a global bearer-token `fetchOptions.auth` reading from `sessionStorage`; exports `authClient` plus the `sessionStorage` accessors for the two stored credentials — `getStoredSession`/`storeSession`/`clearStoredSession` for the bearer session token, `getStoredJwt`/`storeJwt`/`clearStoredJwt` for the signed access token), `src/routes/` file-based routes (`__root.tsx`, `login.tsx`, `auth-callback.tsx`, `index.tsx` — the dashboard), `src/routeTree.gen.ts` **generated** by the TanStack Router Vite plugin from `src/routes/` — don't hand-edit, let the dev server regenerate it.
 - `worker-configuration.d.ts` — **generated** by `wrangler types` (`typegen` script); don't Read it in full (blocked via `.claude/settings.json` deny rule) — `grep` for the specific binding/type you need.
 
 ## Why this worker has no logic of its own
@@ -16,18 +16,18 @@ Better Auth's `admin` plugin (configured in `apps/worker-auth/src/auth.ts`) moun
 
 ## Sign-in flow
 
-Since Google's OAuth `redirect_uri` (and so the session cookie) is pinned to `worker-client`'s origin, an admin session can't be picked up here via cookie — this worker has no cookie of its own. Instead, sign-in rides a bearer-token round trip through `worker-client`'s existing `/login` route:
+`src/routes/login.tsx` redirects straight to worker-auth's own hosted login — no hop through `worker-client` anymore. worker-auth hosts `/login` and `/login/complete` itself (see `apps/worker-auth/CLAUDE.md`), so this worker links directly to it:
 
-1. `src/routes/login.tsx` links to `worker-client`'s `/login?returnTo=<this origin>/auth-callback`.
-2. The visitor signs in with Google on `worker-client` as normal. `worker-client`'s `worker/index.ts` passthrough rewrites the OAuth callback's redirect to append a `#token=<bearer token>` fragment (only because `returnTo` is present and allowlisted — see `apps/worker-client/CLAUDE.md`), and redirects to `returnTo`.
-3. `src/routes/auth-callback.tsx` reads the token from the URL fragment, stores it (`storeToken`, in `sessionStorage` via `src/lib/auth-client.ts`), and redirects to `/`.
-4. `src/routes/index.tsx`'s dashboard `beforeLoad` redirects to `/login` if no token is stored; once signed in, it calls the admin API directly with `authClient` (bearer token attached automatically), rendering "Access denied" for a `user`-role viewer and a user list with role/ban/remove controls for `admin`/`manager`. A `manager` viewer never sees `admin` as a grantable role and every control is disabled on a row whose current role is `admin` — UX-layer mirroring of `worker-auth`'s `manager-restrictions.ts` hook, not the actual enforcement (that always happens server-side).
+1. `src/routes/login.tsx` links to worker-auth's `/login?returnTo=<this origin>/auth-callback`.
+2. The visitor signs in with Google on worker-auth's hosted login page. On success, worker-auth redirects to `returnTo` with `#token=<jwt>&session=<bearer session token>` appended to the URL fragment, both `encodeURIComponent`-encoded.
+3. `src/routes/auth-callback.tsx` reads both values off the fragment via `URLSearchParams`, storing them separately in `sessionStorage` (`storeJwt` for the signed access token, `storeSession` for the bearer session token — both in `src/lib/auth-client.ts`), then redirects to `/`.
+4. `src/routes/index.tsx`'s dashboard `beforeLoad` redirects to `/login` if no JWT is stored. Once loaded, it verifies the stored JWT locally via `verifyAccessToken` (`@capstone/auth-verify`) against worker-auth's JWKS endpoint, and gates the UI on the resulting claims' `role` — "Access denied" for a `user`-role viewer, a user list with role/ban/remove controls for `admin`/`manager`. The admin-plugin mutations themselves (`authClient.admin.setRole`/`banUser`/`unbanUser`/`removeUser`) still use the bearer session token (`getStoredSession`) unchanged — the JWT is only ever used for local role/identity display, never to authorize a mutation. A `manager` viewer never sees `admin` as a grantable role and every control is disabled on a row whose current role is `admin` — UX-layer mirroring of `worker-auth`'s `manager-restrictions.ts` hook, not the actual enforcement (that always happens server-side).
 
-See `docs/superpowers/specs/2026-09-14-admin-user-roles-dashboard-design.md` for the full design.
+See `docs/superpowers/specs/2026-09-14-admin-user-roles-dashboard-design.md` for the original dashboard design and `docs/superpowers/specs/2026-09-15-central-idp-hosted-login-design.md` for the hosted-login rework.
 
 ### Calling the API directly
 
-The curl workflow still works as a fallback for scripting/debugging, independent of the UI above: sign in through `worker-client` as usual, grab your session's bearer token (Better Auth's `bearer` plugin returns one via a `set-auth-token` response header on any request that touches your session, e.g. `get-session`), and call this worker with it:
+The curl workflow still works as a fallback for scripting/debugging, independent of the UI above: sign in through worker-auth's hosted login as usual (via this worker's own `/login`, or any other app pointed at the same worker-auth instance), grab your session's bearer token (Better Auth's `bearer` plugin returns one via a `set-auth-token` response header on any request that touches your session, e.g. `get-session`), and call this worker with it:
 
 ```bash
 curl -H "Authorization: Bearer <token>" http://localhost:8790/api/auth/admin/list-users

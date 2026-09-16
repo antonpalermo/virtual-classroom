@@ -6,40 +6,19 @@ export default defineConfig({
         cloudflareTest({
             wrangler: { configPath: './wrangler.jsonc' },
             miniflare: {
+                // Overrides wrangler.jsonc's real `AUTH_SERVICE` binding (which points at the
+                // separately deployed worker-auth) with a fake handler that echoes back the
+                // request it received, so tests can assert the passthrough forwarded the right
+                // URL/headers without needing worker-auth running.
                 serviceBindings: {
                     AUTH_SERVICE(request) {
-                        const url = new URL(request.url)
-                        if (url.pathname === '/api/auth/callback/google' && url.searchParams.get('code') === 'test') {
-                            return new Response(null, {
-                                status: 302,
-                                headers: {
-                                    location: 'https://example.com/login?returnTo=http%3A%2F%2Flocalhost%3A8790%2Fauth-callback',
-                                    'set-auth-token': 'test-token'
-                                }
-                            })
-                        }
-                        if (url.pathname === '/api/auth/callback/google' && url.searchParams.get('code') === 'evil') {
-                            return new Response(null, {
-                                status: 302,
-                                headers: {
-                                    location: 'https://example.com/login?returnTo=https%3A%2F%2Fattacker.example%2Fsteal',
-                                    'set-auth-token': 'test-token'
-                                }
-                            })
-                        }
-                        if (url.pathname === '/api/auth/callback/google') {
-                            return new Response(null, {
-                                status: 302,
-                                headers: { location: 'https://example.com/', 'set-auth-token': 'test-token' }
-                            })
-                        }
-                        if (url.pathname === '/api/auth/some-other-redirect') {
-                            return new Response(null, {
-                                status: 302,
-                                headers: { location: 'https://example.com/elsewhere', 'set-auth-token': 'test-token' }
-                            })
-                        }
-                        return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })
+                        return new Response(
+                            JSON.stringify({
+                                url: request.url,
+                                authorization: request.headers.get('authorization')
+                            }),
+                            { status: 200, headers: { 'content-type': 'application/json' } }
+                        )
                     }
                 }
             }
