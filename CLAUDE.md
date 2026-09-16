@@ -12,7 +12,7 @@ A virtual classroom / video conferencing app built entirely on Cloudflare Worker
 - `apps/worker-realtime` (`@capstone/realtime`) — the realtime signaling backend (`Messenger` Durable Object). See [apps/worker-realtime/CLAUDE.md](apps/worker-realtime/CLAUDE.md).
 - `apps/worker-auth` (`@capstone/auth`) — the identity worker: Google sign-in/sign-up and the OAuth provider other apps will link against. See [apps/worker-auth/CLAUDE.md](apps/worker-auth/CLAUDE.md).
 - `apps/worker-admin` (`@capstone/admin`) — the admin worker: user management and role assignment, proxied through to `worker-auth`. See [apps/worker-admin/CLAUDE.md](apps/worker-admin/CLAUDE.md).
-- `apps/worker-oidc` (`@capstone/openid-connect`) — empty scaffold, not yet implemented. See [apps/worker-oidc/CLAUDE.md](apps/worker-oidc/CLAUDE.md).
+- `apps/worker-oidc` (`@capstone/openid-connect`) — Better Auth basics (email/password, D1 via Drizzle); not yet an OIDC provider/client. See [apps/worker-oidc/CLAUDE.md](apps/worker-oidc/CLAUDE.md).
 - `packages/web-standards` (`@capstone/standards`) — generated HTTP status code/phrase constants. See [packages/web-standards/CLAUDE.md](packages/web-standards/CLAUDE.md).
 - `packages/config-typescript` (`@capstone/typescript`) — shared base `tsconfig` files. See [packages/config-typescript/CLAUDE.md](packages/config-typescript/CLAUDE.md).
 - `packages/lib-auth-verify` (`@capstone/auth-verify`) — verifies a worker-auth-issued JWT against its JWKS endpoint; consumed by `worker-client` and `worker-admin`. See [packages/lib-auth-verify/CLAUDE.md](packages/lib-auth-verify/CLAUDE.md).
