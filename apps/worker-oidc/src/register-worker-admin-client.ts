@@ -108,7 +108,17 @@ export function registerBootstrapRoute(app: Hono<{ Bindings: Env }>) {
                     client_name: 'worker-admin',
                     redirect_uris: [redirectUri],
                     token_endpoint_auth_method: 'none',
-                    application_type: 'web',
+                    // 'native', not 'web': worker-admin's real local-dev redirect URI is
+                    // http://localhost:8790/auth-callback (loopback + http). In
+                    // validateClientRedirectUri (node_modules/@better-auth/oauth-provider/dist/
+                    // authorize-Crqw4_bR.mjs:1698-1701), 'web' unconditionally rejects loopback
+                    // hosts even over https, so this would 500 on any real local-dev registration.
+                    // 'native' (lines 1702-1710) allows http on loopback and https on non-loopback,
+                    // covering both our local-dev and production redirect URI shapes. Per the
+                    // plugin's OAuthClient type docs, application_type only governs redirect-URI
+                    // validation policy — it has no effect on client auth, PKCE, or
+                    // token_endpoint_auth_method, so worker-admin remains a public PKCE client.
+                    application_type: 'native',
                     skip_consent: false,
                     grant_types: ['authorization_code'],
                     response_types: ['code'],

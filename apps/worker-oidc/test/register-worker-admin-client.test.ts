@@ -83,4 +83,32 @@ describe('POST /internal/oauth-clients/worker-admin', () => {
         expect(firstId).toBeTruthy()
         expect(secondId).toBe(firstId)
     })
+
+    it('registers successfully with a real loopback local-dev redirect URI', async ({ expect }) => {
+        // D1 storage isn't reset between `it` blocks in this file, so clear any `worker-admin`
+        // row left behind by earlier tests (registered against REDIRECT_URI, an https host)
+        // before hitting the bootstrap route with a different redirect_uri — otherwise the
+        // idempotency check (SELECT by name) would just return that earlier row's client_id
+        // without this request's redirect_uri ever reaching adminCreateOAuthClient, and this
+        // test would pass without actually exercising anything.
+        const db = createDb(env.OIDC_DB)
+        await db.delete(oauthClient).where(eq(oauthClient.name, 'worker-admin'))
+
+        // worker-admin's real local-dev redirect URI (see apps/worker-admin/CLAUDE.md): loopback
+        // host + http. Under application_type: 'web' this is unconditionally rejected even over
+        // https, which is the bug this test guards against — see the comment on
+        // `application_type: 'native'` in src/register-worker-admin-client.ts.
+        const loopbackRedirectUri = 'http://localhost:8790/auth-callback'
+        const response = await callAsApp(
+            new Request(`https://example.com/internal/oauth-clients/worker-admin?redirect_uri=${encodeURIComponent(loopbackRedirectUri)}`, {
+                method: 'POST',
+                headers: { authorization: 'Bearer test-secret' }
+            }),
+            { BETTER_AUTH_SECRET: 'test-secret' }
+        )
+
+        expect(response.status).toBe(200)
+        const { client_id } = await response.json<{ client_id: string }>()
+        expect(client_id).toBeTruthy()
+    })
 })
