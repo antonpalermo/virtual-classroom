@@ -5,19 +5,8 @@
 {
     "$schema": "../../node_modules/wrangler/config-schema.json",
     "name": "worker-admin",
-    "main": "worker/index.ts",
     "compatibility_date": "2026-08-22",
     "assets": {
-        "not_found_handling": "single-page-application",
-        "run_worker_first": ["/api/auth/*"]
-    },
-    "observability": {
-        "enabled": true
-    },
-    "upload_source_maps": true,
-    /**
-     * Service Bindings (communicate between multiple Workers)
-     * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
-     */
-    "services": [{ "binding": "AUTH_SERVICE", "service": "worker-auth" }]
+        "not_found_handling": "single-page-application"
+    }
 }

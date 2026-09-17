@@ -1,8 +1,0 @@
-{
-    "extends": "@capstone/typescript/configs/tsconfig.node.json",
-    "compilerOptions": {
-        "tsBuildInfoFile": "../../node_modules/.tmp/admin/tsconfig.worker.tsbuildinfo",
-        "types": ["./worker-configuration.d.ts", "vite/client"]
-    },
-    "include": ["worker"]
-}
