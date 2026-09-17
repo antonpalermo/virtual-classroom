@@ -15,8 +15,10 @@ import { oauthClient, user } from './db/schema'
 // `userId` because `oauthClient.userId` has a DB foreign key to `user.id`, so we upsert a fixed
 // "bootstrap" user row to satisfy it. This never creates a session row or cookie, and the
 // fabricated AuthContext is discarded at the end of the request — it isn't a real login.
-const BOOTSTRAP_USER_ID = 'worker-oidc-bootstrap'
-const BOOTSTRAP_USER_EMAIL = 'worker-oidc-bootstrap@internal.invalid'
+// Exported so tests can pre-seed/inspect this fixed row directly, e.g. to hold it constant while
+// exercising the separate oauth_client.name race below.
+export const BOOTSTRAP_USER_ID = 'worker-oidc-bootstrap'
+export const BOOTSTRAP_USER_EMAIL = 'worker-oidc-bootstrap@internal.invalid'
 
 async function ensureBootstrapUser(db: Db) {
     const [existing] = await db.select().from(user).where(eq(user.id, BOOTSTRAP_USER_ID)).limit(1)
@@ -36,11 +38,36 @@ async function ensureBootstrapUser(db: Db) {
     return created
 }
 
+// The idempotency check below (SELECT by name, then INSERT if absent) is a check-then-act race:
+// two concurrent calls can both pass the "not found" check and both attempt to insert a
+// `worker-admin` row. `oauthClient.name` carries a real unique index (`oauthClient_name_uidx`,
+// see db/schema.ts) so only one INSERT wins; the loser's `adminCreateOAuthClient` call surfaces
+// that failure as a `DrizzleQueryError` (drizzle-orm wraps the underlying D1 error) whose own
+// top-level `.message` is just `Failed query: insert into "oauth_client" ...` — the actual SQLite
+// message (`UNIQUE constraint failed: oauth_client.name`) is nested two levels down the `.cause`
+// chain (`error.cause` is D1's own `Error` wrapping `D1_ERROR: UNIQUE constraint failed: ...`,
+// and `error.cause.cause` is the raw SQLite message underneath that) — confirmed empirically
+// against this exact stack (better-auth's drizzle adapter, `registrationSource: "managed"` skips
+// its own unique-constraint conversion, so nothing upstream normalizes this). We walk the cause
+// chain looking for that specific message rather than assuming which depth it lands at, so we
+// don't misidentify (and swallow) an unrelated error.
+function isDuplicateNameError(error: unknown): boolean {
+    let current: unknown = error
+    for (let depth = 0; current instanceof Error && depth < 5; depth++) {
+        if (current.message.includes('UNIQUE constraint failed') && current.message.includes('oauth_client.name')) {
+            return true
+        }
+        current = current.cause
+    }
+    return false
+}
+
 // Registers worker-admin as a public OAuth client. Called once per environment via a manual
 // curl (see apps/worker-admin/CLAUDE.md), never at runtime by a client itself — that's why this
 // goes through the plugin's SERVER_ONLY adminCreateOAuthClient API rather than dynamic client
 // registration. Idempotent: re-running it returns the existing client_id instead of creating a
-// duplicate row, so it's safe to call again if you're not sure whether it already ran.
+// duplicate row, so it's safe to call again if you're not sure whether it already ran — including
+// when two calls race each other concurrently (see isDuplicateNameError above).
 export function registerBootstrapRoute(app: Hono<{ Bindings: Env }>) {
     app.post('/internal/oauth-clients/worker-admin', async c => {
         if (c.req.header('authorization') !== `Bearer ${c.env.BETTER_AUTH_SECRET}`) {
@@ -74,19 +101,33 @@ export function registerBootstrapRoute(app: Hono<{ Bindings: Env }>) {
             user: bootstrapUser
         }
 
-        const client = await auth.api.adminCreateOAuthClient({
-            headers: new Headers(),
-            body: {
-                client_name: 'worker-admin',
-                redirect_uris: [redirectUri],
-                token_endpoint_auth_method: 'none',
-                application_type: 'web',
-                skip_consent: false,
-                grant_types: ['authorization_code'],
-                response_types: ['code'],
-                scope: 'openid email profile'
+        try {
+            const client = await auth.api.adminCreateOAuthClient({
+                headers: new Headers(),
+                body: {
+                    client_name: 'worker-admin',
+                    redirect_uris: [redirectUri],
+                    token_endpoint_auth_method: 'none',
+                    application_type: 'web',
+                    skip_consent: false,
+                    grant_types: ['authorization_code'],
+                    response_types: ['code'],
+                    scope: 'openid email profile'
+                }
+            })
+            return c.json({ client_id: client.client_id })
+        } catch (error) {
+            if (!isDuplicateNameError(error)) {
+                throw error
             }
-        })
-        return c.json({ client_id: client.client_id })
+
+            // Lost the race: another concurrent call's INSERT won. Re-read the row it created
+            // and return its client_id instead — same success shape as the non-racing path.
+            const [winner] = await db.select().from(oauthClient).where(eq(oauthClient.name, 'worker-admin')).limit(1)
+            if (!winner) {
+                throw error
+            }
+            return c.json({ client_id: winner.clientId })
+        }
     })
 }

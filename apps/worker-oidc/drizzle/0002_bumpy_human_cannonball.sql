@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `oauthClient_name_uidx` ON `oauth_client` (`name`);
