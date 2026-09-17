@@ -1,49 +1,50 @@
 # CLAUDE.md — worker-admin
 
-`@capstone/admin` — the admin worker. A separately deployed Cloudflare Worker for admin tasks (user management, role assignment), kept apart from `worker-client` so the client bundle/deploy stays unrelated to admin surface area.
+`@capstone/admin` — the admin worker. A separately deployed Cloudflare Worker, kept apart from `worker-client` so the client bundle/deploy stays unrelated to admin surface area.
 
-A React 19 + TanStack Router SPA (built with Vite, served by the Worker as static assets via `@cloudflare/vite-plugin`) provides a working sign-in flow and user-management dashboard. Same shape as `apps/worker-client`.
+A React 19 + TanStack Router SPA (built with Vite, served as static assets via `@cloudflare/vite-plugin` in dev and the `assets` config in `wrangler.jsonc` when deployed) provides a sign-in flow against `apps/worker-oidc`. There is no backend Worker anymore — no `worker/` directory, no service bindings — this is a fully static SPA. There is also no user-management dashboard: the previous Better-Auth-admin-plugin dashboard (role assignment, ban/unban, remove) was dropped entirely when this worker moved off `worker-auth`, and is deferred to a future plan. Once signed in, the only thing shown is "Signed in as `<email>`" plus a sign-out button.
 
 ## Layout
 
-- `worker/index.ts` — the whole backend: a bare `ExportedHandler` that forwards any `/api/auth/*` request to `AUTH_SERVICE` (a service binding to `worker-auth`) and 404s everything else. Byte-for-byte the same shape as `apps/worker-client/worker/index.ts`'s passthrough.
-- `src/` — the frontend SPA. `src/main.tsx` entry point, `src/lib/auth-client.ts` (the `better-auth/react` client, configured with the `adminClient()` plugin and a global bearer-token `fetchOptions.auth` reading from `sessionStorage`; exports `authClient` plus the `sessionStorage` accessors for the two stored credentials — `getStoredSession`/`storeSession`/`clearStoredSession` for the bearer session token, `getStoredJwt`/`storeJwt`/`clearStoredJwt` for the signed access token), `src/routes/` file-based routes (`__root.tsx`, `login.tsx`, `auth-callback.tsx`, `index.tsx` — the dashboard), `src/routeTree.gen.ts` **generated** by the TanStack Router Vite plugin from `src/routes/` — don't hand-edit, let the dev server regenerate it.
+- `src/main.tsx` — entry point, mounts the TanStack Router `RouterProvider`.
+- `src/lib/pkce.ts` — `createPkcePair()`, generates a random `code_verifier` and its S256 `code_challenge` (both base64url) using Web Crypto — the PKCE pair for the Authorization Code + PKCE flow below.
+- `src/lib/auth-client.ts` — `sessionStorage` accessors for the one stored credential: `getStoredJwt`/`storeJwt`/`clearStoredJwt`, keyed as `admin_jwt`. That's the only thing this worker persists now — no bearer session token, no `better-auth/react` client, no `adminClient()` plugin.
+- `src/routes/` — file-based routes: `__root.tsx` (bare `Outlet` + `TanStackRouterDevtools`), `login.tsx`, `auth-callback.tsx`, `index.tsx` (the signed-in view — see Sign-in flow below).
+- `src/routeTree.gen.ts` — **generated** by the TanStack Router Vite plugin from `src/routes/` — don't hand-edit, let the dev server regenerate it.
 - `worker-configuration.d.ts` — **generated** by `wrangler types` (`typegen` script); don't Read it in full (blocked via `.claude/settings.json` deny rule) — `grep` for the specific binding/type you need.
-
-## Why this worker has no logic of its own
-
-Better Auth's `admin` plugin (configured in `apps/worker-auth/src/auth.ts`) mounts its routes under the auth instance's own basePath — `/api/auth/admin/*` — so proxying all of `/api/auth/*` already exposes every admin operation (list/search users, `set-role`, ban/unban, remove, impersonate). `worker-auth` is the single place that decides who's allowed to call them; this worker deliberately does not duplicate that check, so there's only one place authorization logic can drift out of sync. See `docs/superpowers/specs/2026-09-12-worker-admin-design.md` for the full design.
 
 ## Sign-in flow
 
-`src/routes/login.tsx` redirects straight to worker-auth's own hosted login — no hop through `worker-client` anymore. worker-auth hosts `/login` and `/login/complete` itself (see `apps/worker-auth/CLAUDE.md`), so this worker links directly to it:
+Authorization Code + PKCE against `apps/worker-oidc`'s OAuth provider, with `worker-oidc` hosting its own login/signup/consent pages (`src/pages.ts` there — see `apps/worker-oidc/CLAUDE.md`):
 
-1. `src/routes/login.tsx` links to worker-auth's `/login?returnTo=<this origin>/auth-callback`.
-2. The visitor signs in with Google on worker-auth's hosted login page. On success, worker-auth redirects to `returnTo` with `#token=<jwt>&session=<bearer session token>` appended to the URL fragment, both `encodeURIComponent`-encoded.
-3. `src/routes/auth-callback.tsx` reads both values off the fragment via `URLSearchParams`, storing them separately in `sessionStorage` (`storeJwt` for the signed access token, `storeSession` for the bearer session token — both in `src/lib/auth-client.ts`), then redirects to `/`.
-4. `src/routes/index.tsx`'s dashboard `beforeLoad` redirects to `/login` if no JWT is stored. Once loaded, it verifies the stored JWT locally via `verifyAccessToken` (`@capstone/auth-verify`) against worker-auth's JWKS endpoint, and gates the UI on the resulting claims' `role` — "Access denied" for a `user`-role viewer, a user list with role/ban/remove controls for `admin`/`manager`. The admin-plugin mutations themselves (`authClient.admin.setRole`/`banUser`/`unbanUser`/`removeUser`) still use the bearer session token (`getStoredSession`) unchanged — the JWT is only ever used for local role/identity display, never to authorize a mutation. A `manager` viewer never sees `admin` as a grantable role and every control is disabled on a row whose current role is `admin` — UX-layer mirroring of `worker-auth`'s `manager-restrictions.ts` hook, not the actual enforcement (that always happens server-side).
+1. `src/routes/login.tsx`'s "Sign in" button calls `createPkcePair()`, generates a random `state` (`crypto.randomUUID()`), and stashes `codeVerifier`/`state` in `sessionStorage` (`oidc_code_verifier`, `oidc_state`). It then redirects to `worker-oidc`'s `/api/auth/oauth2/authorize` with `client_id` (from `VITE_OIDC_CLIENT_ID`), `redirect_uri` (`<this origin>/auth-callback`), `response_type=code`, `scope=openid email profile`, the PKCE `code_challenge`/`code_challenge_method=S256`, and `state`.
+2. The visitor authenticates on `worker-oidc`'s own hosted `/login` (or `/signup`) page and, if it's their first time authorizing this client, its `/consent` page.
+3. `worker-oidc` redirects back to `redirect_uri` (this worker's `/auth-callback`) with `?code=...&state=...`.
+4. `src/routes/auth-callback.tsx` reads `code`/`state` off the query string, checks `state` against the stashed `oidc_state`, retrieves `oidc_code_verifier`, and clears both from `sessionStorage`. It then `POST`s `worker-oidc`'s `/api/auth/oauth2/token` (`grant_type=authorization_code`, `code`, `redirect_uri`, `client_id`, `code_verifier`, form-urlencoded) directly from the browser (no backend hop). On success it takes the response's `id_token`, stores it via `storeJwt` (`src/lib/auth-client.ts`), and navigates to `/`. Any failure (missing/mismatched state, non-OK response, missing `id_token`) sends the visitor back to `/login`.
+5. `src/routes/index.tsx`'s `beforeLoad` redirects to `/login` if no JWT is stored. Once mounted, it verifies the stored JWT locally via `verifyAccessToken` (`@capstone/auth-verify`) against `worker-oidc`'s JWKS endpoint (`${VITE_OIDC_ORIGIN}/api/auth/jwks`). A stale/invalid token clears storage and redirects to `/login`; a valid one renders "Signed in as `<claims.email>`" and a Sign out button (`clearStoredJwt` + navigate to `/login`).
 
-See `docs/superpowers/specs/2026-09-14-admin-user-roles-dashboard-design.md` for the original dashboard design and `docs/superpowers/specs/2026-09-15-central-idp-hosted-login-design.md` for the hosted-login rework.
+Both `login.tsx` and `auth-callback.tsx` default `VITE_OIDC_ORIGIN` to `http://localhost:8791` (worker-oidc's local dev port) when the env var isn't set; `VITE_OIDC_CLIENT_ID` has no fallback and must be supplied (see below).
 
-### Calling the API directly
+### Bootstrapping a client against worker-oidc
 
-The curl workflow still works as a fallback for scripting/debugging, independent of the UI above: sign in through worker-auth's hosted login as usual (via this worker's own `/login`, or any other app pointed at the same worker-auth instance), grab your session's bearer token (Better Auth's `bearer` plugin returns one via a `set-auth-token` response header on any request that touches your session, e.g. `get-session`), and call this worker with it:
+Nothing in `worker-oidc` self-registers this worker as an OAuth client — it's a one-time (idempotent) manual call against `worker-oidc`'s bootstrap route (`apps/worker-oidc/src/register-worker-admin-client.ts`), gated by `worker-oidc`'s own `BETTER_AUTH_SECRET`:
 
 ```bash
-curl -H "Authorization: Bearer <token>" http://localhost:8790/api/auth/admin/list-users
+curl -X POST "http://localhost:8791/internal/oauth-clients/worker-admin?redirect_uri=http://localhost:8790/auth-callback" \
+    -H "Authorization: Bearer <worker-oidc's BETTER_AUTH_SECRET>"
 ```
 
-The very first admin account is granted via `worker-auth`'s `ADMIN_USER_IDS` env var (a comma-separated list of Better Auth user ids) — see `apps/worker-auth/CLAUDE.md`. Once at least one admin exists, further admins are promoted via `POST /api/auth/admin/set-role` (or the dashboard's role selector).
+This registers (or, if already registered, just looks up) a public, PKCE-required, native-app OAuth client named `worker-admin` and returns `{"client_id": "..."}`. Copy that `client_id` into this worker's `.env` (copy `.env.example`, gitignored) as `VITE_OIDC_CLIENT_ID`, alongside `VITE_OIDC_ORIGIN` pointing at `worker-oidc`. Re-run the same curl against whatever `worker-oidc` deployment/redirect URI you're targeting (e.g. a deployed `worker-admin` origin) to get (or confirm) the `client_id` for that environment.
 
 ## Commands (run from this directory, or via `npm run <script> -w @capstone/admin` from root)
 
 - `dev` — `vite` (fixed local port `8790`, inspector `9232` — see `vite.config.ts`)
 - `build` — `tsc -b && vite build`
 - `preview` — `npm run build && vite preview`
-- `deploy` — `npm run build && wrangler deploy`
+- `deploy` — `npm run build && wrangler deploy` (uploads the built static assets only — there's no Worker logic to deploy)
 - `typegen` — `wrangler types` (regenerates `worker-configuration.d.ts`)
-- `test` / `test:run` — Vitest (`@cloudflare/vitest-pool-workers`, with `AUTH_SERVICE` mocked in `vitest.config.mjs` — no real `worker-auth` instance needed to run these tests)
+- `test` / `test:run` — plain Vitest (`vitest.config.mjs` is an empty config — no `@cloudflare/vitest-pool-workers`, since there's no Worker runtime code left to test against). Only `src/lib/pkce.test.ts` exists today, covering `createPkcePair()`'s shape and the S256 challenge derivation.
 
 ## TypeScript config
 
-`tsconfig.json` is a references-only shell pointing at `tsconfig.app.json` (browser/React code under `src/`), `tsconfig.node.json` (Vite config), and `tsconfig.worker.json` (the backend under `worker/`, typed against `worker-configuration.d.ts`) — all three extending the shared bases in `@capstone/typescript/configs/` (see `packages/config-typescript/CLAUDE.md`). Same shape as `apps/worker-client`.
+`tsconfig.json` is a references-only shell pointing at `tsconfig.app.json` (browser/React code under `src/`) and `tsconfig.node.json` (`vite.config.ts`) — both extending the shared bases in `@capstone/typescript/configs/` (see `packages/config-typescript/CLAUDE.md`). There is no `tsconfig.worker.json` anymore — with the backend Worker deleted, there's no code left that types against `worker-configuration.d.ts` (the `typegen` script still regenerates it, but nothing under `src/` currently imports `Env` or any other type from it).
