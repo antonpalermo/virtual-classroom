@@ -1,0 +1,28 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+    "$schema": "../../node_modules/wrangler/config-schema.json",
+    "name": "worker-oidc",
+    "main": "src/index.ts",
+    "compatibility_date": "2026-08-22",
+    "d1_databases": [
+        {
+            "binding": "OIDC_DB",
+            "database_name": "worker-oidc",
+            "database_id": "00000000-0000-0000-0000-000000000000",
+            "migrations_dir": "drizzle"
+        }
+    ],
+    "observability": {
+        "enabled": true
+    },
+    "upload_source_maps": true,
+    "dev": {
+        // Defaults (8787/9229) collide with worker-client; 8788/9231 and 8789/9230 are taken by
+        // worker-realtime and worker-auth respectively.
+        "port": 8790,
+        "inspector_port": 9232
+    }
+}
