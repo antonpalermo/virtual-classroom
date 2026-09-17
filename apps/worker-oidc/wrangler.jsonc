@@ -20,9 +20,9 @@
     },
     "upload_source_maps": true,
     "dev": {
-        // Defaults (8787/9229) collide with worker-client; 8788/9231 and 8789/9230 are taken by
-        // worker-realtime and worker-auth respectively.
-        "port": 8790,
-        "inspector_port": 9232
+        // Defaults (8787/9229) collide with worker-client; 8788/9231, 8789/9230, and 8790/9232
+        // are taken by worker-realtime, worker-auth, and worker-admin respectively.
+        "port": 8791,
+        "inspector_port": 9233
     }
 }
