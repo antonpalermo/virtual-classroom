@@ -2,10 +2,13 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { createAuth } from './auth'
 import { createDb } from './db/client'
+import { registerBootstrapRoute } from './register-worker-admin-client'
 
 const app = new Hono<{ Bindings: Env }>()
 
 app.get('/', c => c.text('ok'))
+
+registerBootstrapRoute(app)
 
 // These three are called directly, cross-origin, from worker-admin's browser JS (no service
 // binding involved) — a public JWKS, a userinfo lookup gated by the caller's own access token,

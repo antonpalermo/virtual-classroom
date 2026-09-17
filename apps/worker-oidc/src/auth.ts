@@ -19,7 +19,8 @@ export function createAuth(db: Db, env: Env) {
             jwt(),
             oauthProvider({
                 loginPage: '/login',
-                consentPage: '/consent'
+                consentPage: '/consent',
+                signup: { page: '/signup' }
             })
         ]
     })
