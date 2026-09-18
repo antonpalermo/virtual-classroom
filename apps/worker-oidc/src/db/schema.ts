@@ -132,7 +132,7 @@ export const oauthClient = sqliteTable(
         referenceId: text('reference_id'),
         metadata: text('metadata', { mode: 'json' })
     },
-    table => [index('oauthClient_userId_idx').on(table.userId)]
+    table => [index('oauthClient_userId_idx').on(table.userId), uniqueIndex('oauthClient_name_uidx').on(table.name)]
 )
 
 export const oauthResource = sqliteTable('oauth_resource', {

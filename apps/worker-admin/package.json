@@ -17,14 +17,12 @@
         "@capstone/auth-verify": "*",
         "@tanstack/react-router": "^1.170.31",
         "@tanstack/react-router-devtools": "^1.167.1",
-        "better-auth": "^1.7.1",
         "react": "^19.2.8",
         "react-dom": "^19.2.8"
     },
     "devDependencies": {
         "@capstone/typescript": "*",
         "@cloudflare/vite-plugin": "^1.53.0",
-        "@cloudflare/vitest-pool-workers": "^0.22.0",
         "@cloudflare/workers-types": "^5.20260826.1",
         "@tanstack/router-plugin": "^1.168.34",
         "@types/node": "^24.13.3",

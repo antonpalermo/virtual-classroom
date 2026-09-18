@@ -3,7 +3,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose'
 export interface AccessTokenClaims {
     sub: string
     email: string
-    role: string
+    role?: string
     exp: number
 }
 
@@ -23,12 +23,15 @@ function getJwks(jwksUrl: string) {
 export async function verifyAccessToken(token: string, jwksUrl: string): Promise<AccessTokenClaims | null> {
     try {
         const { payload } = await jwtVerify(token, getJwks(jwksUrl), {
-            requiredClaims: ['exp', 'sub', 'email', 'role']
+            requiredClaims: ['exp', 'sub', 'email']
         })
-        if (typeof payload.sub !== 'string' || typeof payload.email !== 'string' || typeof payload.role !== 'string') {
+        if (typeof payload.sub !== 'string' || typeof payload.email !== 'string') {
             return null
         }
-        return { sub: payload.sub, email: payload.email, role: payload.role, exp: payload.exp as number }
+        if (payload.role !== undefined && typeof payload.role !== 'string') {
+            return null
+        }
+        return { sub: payload.sub, email: payload.email, role: payload.role as string | undefined, exp: payload.exp as number }
     } catch {
         return null
     }

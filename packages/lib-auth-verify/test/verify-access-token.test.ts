@@ -66,10 +66,11 @@ describe('verifyAccessToken', () => {
         expect(result).toBeNull()
     })
 
-    it('returns null when the role claim is missing', async () => {
+    it('returns claims with role undefined when the role claim is missing', async () => {
         const token = await signToken({ sub: 'user-1', email: 'a@example.com' })
         const result = await verifyAccessToken(token, JWKS_URL)
-        expect(result).toBeNull()
+        expect(result).toMatchObject({ sub: 'user-1', email: 'a@example.com' })
+        expect(result?.role).toBeUndefined()
     })
 
     it('returns null when the exp claim is missing', async () => {

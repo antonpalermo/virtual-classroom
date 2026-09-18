@@ -11,6 +11,6 @@ const placeholderD1 = {} as D1Database
 const db = createDb(placeholderD1)
 
 export const auth = createAuth(db, {
-    BETTER_AUTH_URL: 'http://localhost:8790',
+    BETTER_AUTH_URL: 'http://localhost:8791',
     BETTER_AUTH_SECRET: 'cli-schema-generation-placeholder-secret-value-32'
 } as Env)

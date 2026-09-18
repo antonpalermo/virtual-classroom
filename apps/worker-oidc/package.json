@@ -8,7 +8,9 @@
         "start": "wrangler dev",
         "typegen": "wrangler types",
         "lint": "biome check .",
-        "migrations:auth": "wrangler d1 migrations apply worker-oidc --local"
+        "migrations:auth": "wrangler d1 migrations apply worker-oidc --local",
+        "test": "vitest",
+        "test:run": "vitest run"
     },
     "dependencies": {
         "@better-auth/oauth-provider": "^1.7.1",
@@ -18,9 +20,11 @@
     },
     "devDependencies": {
         "@capstone/typescript": "*",
+        "@cloudflare/vitest-pool-workers": "^0.22.0",
         "@cloudflare/workers-types": "^5.20260826.1",
         "drizzle-kit": "^0.31.10",
         "typescript": "^7.0.2",
+        "vitest": "^4.1.11",
         "wrangler": "^4.126.0"
     }
 }
