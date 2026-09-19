@@ -2,7 +2,7 @@ import { oauthProvider } from '@better-auth/oauth-provider'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { jwt } from 'better-auth/plugins'
-import type { Db } from './db/client'
+import type { Db } from './db/client.js'
 
 export function createAuth(db: Db, env: Env) {
     return betterAuth({
@@ -30,7 +30,13 @@ export function createAuth(db: Db, env: Env) {
             oauthProvider({
                 loginPage: '/login',
                 consentPage: '/consent',
-                signup: { page: '/signup' }
+                signup: { page: '/signup' },
+                // Required for src/routes/{login,signup,consent}.tsx's client-name lookups
+                // (POST /api/auth/oauth2/public-client-prelogin) to work at all — without this,
+                // @better-auth/oauth-provider's publicSessionMiddleware unconditionally throws
+                // BAD_REQUEST on that endpoint, and the pages silently fall back to showing the
+                // raw client_id instead of the client's display name.
+                allowPublicClientPrelogin: true
             })
         ]
     })

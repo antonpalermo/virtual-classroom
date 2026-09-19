@@ -5,7 +5,7 @@
 {
     "$schema": "../../node_modules/wrangler/config-schema.json",
     "name": "worker-oidc",
-    "main": "src/index.ts",
+    "main": "worker/index.ts",
     "compatibility_date": "2026-08-22",
     "d1_databases": [
         {
@@ -15,14 +15,12 @@
             "migrations_dir": "drizzle"
         }
     ],
+    "assets": {
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/auth/*", "/internal/*"]
+    },
     "observability": {
         "enabled": true
     },
-    "upload_source_maps": true,
-    "dev": {
-        // Defaults (8787/9229) collide with worker-client; 8788/9231, 8789/9230, and 8790/9232
-        // are taken by worker-realtime, worker-auth, and worker-admin respectively.
-        "port": 8791,
-        "inspector_port": 9233
-    }
+    "upload_source_maps": true
 }

@@ -1,0 +1,9 @@
+{
+    "extends": "@capstone/typescript/configs/tsconfig.node.json",
+    "compilerOptions": {
+        "tsBuildInfoFile": "../../node_modules/.tmp/openid-connect/tsconfig.worker.tsbuildinfo",
+        "types": ["./worker-configuration.d.ts", "vite/client", "node"],
+        "strict": true
+    },
+    "include": ["worker", "auth.cli.ts", "drizzle.config.ts"]
+}
