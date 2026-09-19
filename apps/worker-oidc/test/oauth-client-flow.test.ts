@@ -1,5 +1,5 @@
 import { describe, it } from 'vitest'
-import { callAsApp } from './helpers/call-app'
+import { callAsApp } from './helpers/call-app.js'
 
 const REDIRECT_URI = 'https://admin.example.test/auth-callback'
 
@@ -62,11 +62,11 @@ describe('OAuth client flow (worker-admin against worker-oidc)', () => {
         expect(signUpResponse.status).toBeLessThan(300)
         const cookie = signUpResponse.headers
             .getSetCookie()
-            .find(entry => entry.includes('session_token'))
+            .find((entry: string) => entry.includes('session_token'))
             ?.split(';')[0]
         if (!cookie) throw new Error('expected a session cookie from sign-up')
 
-        // Mirrors what login.html's own JS does after a successful sign-in: replay the exact
+        // Mirrors what src/routes/login.tsx does after a successful sign-in: replay the exact
         // signed query string /login received back onto /oauth2/authorize.
         const resumeResponse = await callAsApp(
             new Request(`https://example.com/api/auth/oauth2/authorize${loginRedirect.search}`, { headers: { cookie } })
@@ -105,5 +105,38 @@ describe('OAuth client flow (worker-admin against worker-oidc)', () => {
         const tokens = await tokenResponse.json<{ access_token: string; id_token: string }>()
         expect(tokens.access_token).toBeTruthy()
         expect(tokens.id_token).toBeTruthy()
+    })
+
+    it('resolves the requesting client name via public-client-prelogin', async ({ expect }) => {
+        // Regression for allowPublicClientPrelogin: true in worker/auth.ts — without it this
+        // endpoint unconditionally 400s and src/routes/{login,signup,consent}.tsx silently fall
+        // back to showing the raw client_id instead of the client's display name.
+        const clientId = await registerWorkerAdminClient()
+        const { codeChallenge } = await generatePkcePair()
+
+        const authorizeQuery = new URLSearchParams({
+            response_type: 'code',
+            client_id: clientId,
+            redirect_uri: REDIRECT_URI,
+            scope: 'openid email profile',
+            code_challenge: codeChallenge,
+            code_challenge_method: 'S256',
+            state: 'test-state'
+        }).toString()
+
+        const authorizeResponse = await callAsApp(new Request(`https://example.com/api/auth/oauth2/authorize?${authorizeQuery}`))
+        const loginRedirect = new URL(authorizeResponse.headers.get('location') ?? '', 'https://example.com')
+        expect(loginRedirect.pathname).toBe('/login')
+
+        const prelookupResponse = await callAsApp(
+            new Request('https://example.com/api/auth/oauth2/public-client-prelogin', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ client_id: clientId, oauth_query: loginRedirect.search.slice(1) })
+            })
+        )
+        expect(prelookupResponse.status).toBe(200)
+        const { client_name: prelookupClientName } = await prelookupResponse.json<{ client_name: string }>()
+        expect(prelookupClientName).toBe('worker-admin')
     })
 })

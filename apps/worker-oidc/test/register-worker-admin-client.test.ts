@@ -1,10 +1,10 @@
 import { env } from 'cloudflare:workers'
 import { eq } from 'drizzle-orm'
 import { describe, it } from 'vitest'
-import { createDb } from '../worker/db/client'
-import { oauthClient, user } from '../worker/db/schema'
-import { BOOTSTRAP_USER_EMAIL, BOOTSTRAP_USER_ID } from '../worker/register-worker-admin-client'
-import { callAsApp } from './helpers/call-app'
+import { createDb } from '../worker/db/client.js'
+import { oauthClient, user } from '../worker/db/schema.js'
+import { BOOTSTRAP_USER_EMAIL, BOOTSTRAP_USER_ID } from '../worker/register-worker-admin-client.js'
+import { callAsApp } from './helpers/call-app.js'
 
 const REDIRECT_URI = 'https://admin.example.test/auth-callback'
 

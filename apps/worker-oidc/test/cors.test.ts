@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { callAsApp } from './helpers/call-app'
+import { callAsApp } from './helpers/call-app.js'
 
 describe('CORS on cross-origin browser endpoints', () => {
     it.each(['/api/auth/jwks', '/api/auth/oauth2/userinfo'])('opens CORS on %s', async path => {

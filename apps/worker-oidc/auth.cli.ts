@@ -1,8 +1,8 @@
-// Used only by `npx auth@latest generate` to produce src/db/schema.ts.
+// Used only by `npx auth@latest generate` to produce worker/db/schema.ts.
 // The CLI runs under plain Node.js and has no real D1 binding available,
 // so this constructs `createAuth` with a placeholder database — schema
 // generation only reads the configured plugins/fields, it never queries.
-// Never imported by the real Worker (see src/index.ts).
+// Never imported by the real Worker (see worker/index.ts).
 
 import { createAuth } from './worker/auth.js'
 import { createDb } from './worker/db/client.js'
