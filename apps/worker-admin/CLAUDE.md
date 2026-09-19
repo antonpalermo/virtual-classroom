@@ -15,7 +15,7 @@ A React 19 + TanStack Router SPA (built with Vite, served as static assets via `
 
 ## Sign-in flow
 
-Authorization Code + PKCE against `apps/worker-oidc`'s OAuth provider, with `worker-oidc` hosting its own login/signup/consent pages (`src/pages.ts` there — see `apps/worker-oidc/CLAUDE.md`):
+Authorization Code + PKCE against `apps/worker-oidc`'s OAuth provider, with `worker-oidc` hosting its own login/signup/consent pages (React routes under `src/routes/` there — see `apps/worker-oidc/CLAUDE.md`):
 
 1. `src/routes/login.tsx`'s "Sign in" button calls `createPkcePair()`, generates a random `state` (`crypto.randomUUID()`), and stashes `codeVerifier`/`state` in `sessionStorage` (`oidc_code_verifier`, `oidc_state`). It then redirects to `worker-oidc`'s `/api/auth/oauth2/authorize` with `client_id` (from `VITE_OIDC_CLIENT_ID`), `redirect_uri` (`<this origin>/auth-callback`), `response_type=code`, `scope=openid email profile`, the PKCE `code_challenge`/`code_challenge_method=S256`, and `state`.
 2. The visitor authenticates on `worker-oidc`'s own hosted `/login` (or `/signup`) page and, if it's their first time authorizing this client, its `/consent` page.
