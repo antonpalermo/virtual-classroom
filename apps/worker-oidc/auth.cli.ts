@@ -4,8 +4,8 @@
 // generation only reads the configured plugins/fields, it never queries.
 // Never imported by the real Worker (see src/index.ts).
 
-import { createAuth } from './src/auth'
-import { createDb } from './src/db/client'
+import { createAuth } from './worker/auth'
+import { createDb } from './worker/db/client'
 
 const placeholderD1 = {} as D1Database
 const db = createDb(placeholderD1)
