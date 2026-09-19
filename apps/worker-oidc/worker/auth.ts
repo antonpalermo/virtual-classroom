@@ -12,6 +12,12 @@ export function createAuth(db: Db, env: Env) {
         emailAndPassword: {
             enabled: true
         },
+        socialProviders: {
+            google: {
+                clientId: env.GOOGLE_CLIENT_ID,
+                clientSecret: env.GOOGLE_CLIENT_SECRET
+            }
+        },
         // 'https://example.com' matches the origin the test suite's synthetic requests use,
         // same as worker-auth's own trustedOrigins (see apps/worker-auth/src/auth.ts) — without
         // it, better-auth's originCheckMiddleware rejects the /oauth2/consent POST (which sends

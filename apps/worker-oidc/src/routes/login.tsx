@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { type FormEvent, useEffect, useState } from 'react'
+import { GoogleButton } from '../GoogleButton'
 
 export const Route = createFileRoute('/login')({
     component: LoginRoute
@@ -52,6 +53,7 @@ function LoginRoute() {
                 <button type="submit">Sign in</button>
             </form>
             {error && <p style={{ color: 'red' }}>{error}</p>}
+            <GoogleButton oauthQuery={oauthQuery} />
             <p>
                 <a href={`/signup?${oauthQuery}`}>Need an account? Sign up</a>
             </p>
