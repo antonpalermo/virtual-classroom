@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { createAuth } from './auth'
-import { createDb } from './db/client'
-import { registerBootstrapRoute } from './register-worker-admin-client'
+import { createAuth } from './auth.js'
+import { createDb } from './db/client.js'
+import { registerBootstrapRoute } from './register-worker-admin-client.js'
 
 const app = new Hono<{ Bindings: Env }>()
 

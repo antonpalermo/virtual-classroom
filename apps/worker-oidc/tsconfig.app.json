@@ -1,0 +1,7 @@
+{
+    "extends": "@capstone/typescript/configs/tsconfig.app.json",
+    "compilerOptions": {
+        "tsBuildInfoFile": "../../node_modules/.tmp/openid-connect/tsconfig.app.tsbuildinfo"
+    },
+    "include": ["src"]
+}

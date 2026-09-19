@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm'
 import type { Hono } from 'hono'
-import { createAuth } from './auth'
-import { createDb, type Db } from './db/client'
-import { oauthClient, user } from './db/schema'
+import { createAuth } from './auth.js'
+import { createDb, type Db } from './db/client.js'
+import { oauthClient, user } from './db/schema.js'
 
 // adminCreateOAuthClient is SERVER_ONLY (not reachable over the plugin's HTTP router), but its
 // handler still unconditionally requires a session — `createOAuthClientEndpoint` in
