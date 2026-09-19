@@ -27,7 +27,7 @@ Both `login.tsx` and `auth-callback.tsx` default `VITE_OIDC_ORIGIN` to `http://l
 
 ### Bootstrapping a client against worker-oidc
 
-Nothing in `worker-oidc` self-registers this worker as an OAuth client — it's a one-time (idempotent) manual call against `worker-oidc`'s bootstrap route (`apps/worker-oidc/src/register-worker-admin-client.ts`), gated by `worker-oidc`'s own `BETTER_AUTH_SECRET`:
+Nothing in `worker-oidc` self-registers this worker as an OAuth client — it's a one-time (idempotent) manual call against `worker-oidc`'s bootstrap route (`apps/worker-oidc/worker/register-worker-admin-client.ts`), gated by `worker-oidc`'s own `BETTER_AUTH_SECRET`:
 
 ```bash
 curl -X POST "http://localhost:8791/internal/oauth-clients/worker-admin?redirect_uri=http://localhost:8790/auth-callback" \
