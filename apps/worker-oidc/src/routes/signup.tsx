@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { type FormEvent, useEffect, useState } from 'react'
+import { GoogleButton } from '../GoogleButton'
 
 export const Route = createFileRoute('/signup')({
     component: SignupRoute
@@ -65,6 +66,7 @@ function SignupRoute() {
                 <button type="submit">Sign up</button>
             </form>
             {error && <p style={{ color: 'red' }}>{error}</p>}
+            <GoogleButton oauthQuery={oauthQuery} />
         </div>
     )
 }

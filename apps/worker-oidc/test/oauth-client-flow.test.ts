@@ -139,4 +139,44 @@ describe('OAuth client flow (worker-admin against worker-oidc)', () => {
         const { client_name: prelookupClientName } = await prelookupResponse.json<{ client_name: string }>()
         expect(prelookupClientName).toBe('worker-admin')
     })
+
+    it('accepts the signed oauth_query on sign-in/social and rejects a tampered one', async ({ expect }) => {
+        // src/GoogleButton.tsx sends oauth_query so the oauth-provider plugin tracks the flow
+        // (prompt=login / max_age handling) instead of just replaying callbackURL.
+        const clientId = await registerWorkerAdminClient()
+        const { codeChallenge } = await generatePkcePair()
+        const authorizeQuery = new URLSearchParams({
+            response_type: 'code',
+            client_id: clientId,
+            redirect_uri: REDIRECT_URI,
+            scope: 'openid email profile',
+            code_challenge: codeChallenge,
+            code_challenge_method: 'S256',
+            state: 'test-state'
+        }).toString()
+        const authorizeResponse = await callAsApp(new Request(`https://example.com/api/auth/oauth2/authorize?${authorizeQuery}`))
+        const signedQuery = new URL(authorizeResponse.headers.get('location') ?? '', 'https://example.com').search.slice(1)
+
+        const socialSignIn = (oauthQuery: string) =>
+            callAsApp(
+                new Request('https://example.com/api/auth/sign-in/social', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                        provider: 'google',
+                        callbackURL: `/api/auth/oauth2/authorize?${oauthQuery}`,
+                        errorCallbackURL: `/login?${oauthQuery}`,
+                        oauth_query: oauthQuery
+                    })
+                }),
+                { BETTER_AUTH_URL: 'https://example.com', GOOGLE_CLIENT_ID: 'test-client-id', GOOGLE_CLIENT_SECRET: 'test-client-secret' }
+            )
+
+        const valid = await socialSignIn(signedQuery)
+        expect(valid.status).toBe(200)
+        expect(new URL((await valid.json<{ url: string }>()).url).origin).toBe('https://accounts.google.com')
+
+        const tampered = await socialSignIn(signedQuery.replace('test-state', 'other-state'))
+        expect(tampered.status).toBe(400)
+    })
 })
