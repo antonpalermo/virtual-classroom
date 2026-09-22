@@ -54,9 +54,11 @@ function LoginRoute() {
             </form>
             {error && <p style={{ color: 'red' }}>{error}</p>}
             <GoogleButton oauthQuery={oauthQuery} />
-            <p>
-                <a href={`/signup?${oauthQuery}`}>Need an account? Sign up</a>
-            </p>
+            {clientName !== 'worker-admin' && (
+                <p>
+                    <a href={`/signup?${oauthQuery}`}>Need an account? Sign up</a>
+                </p>
+            )}
         </div>
     )
 }

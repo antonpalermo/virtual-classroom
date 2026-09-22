@@ -32,9 +32,21 @@ async function registerWorkerAdminClient() {
 }
 
 describe('OAuth client flow (worker-admin against worker-oidc)', () => {
-    it('completes sign-up, consent, and token exchange for the registered public client', async ({ expect }) => {
+    it('completes sign-in, consent, and token exchange for the registered public client', async ({ expect }) => {
         const clientId = await registerWorkerAdminClient()
         const { codeVerifier, codeChallenge } = await generatePkcePair()
+
+        // worker-admin has no self-service sign-up (see the before hook in worker/auth.ts) — the
+        // account has to already exist, same as it would via worker/bootstrap-admin-user.ts.
+        // Sign up with no client_id in the body: that hook only blocks worker-admin's own client_id.
+        const seedResponse = await callAsApp(
+            new Request('https://example.com/api/auth/sign-up/email', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ name: 'Test Admin', email: 'admin@example.com', password: 'correct-horse-battery' })
+            })
+        )
+        expect(seedResponse.status).toBeLessThan(300)
 
         const authorizeQuery = new URLSearchParams({
             response_type: 'code',
@@ -52,19 +64,19 @@ describe('OAuth client flow (worker-admin against worker-oidc)', () => {
         const loginRedirect = new URL(authorizeResponse.headers.get('location') ?? '', 'https://example.com')
         expect(loginRedirect.pathname).toBe('/login')
 
-        const signUpResponse = await callAsApp(
-            new Request('https://example.com/api/auth/sign-up/email', {
+        const signInResponse = await callAsApp(
+            new Request('https://example.com/api/auth/sign-in/email', {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ name: 'Test Admin', email: 'admin@example.com', password: 'correct-horse-battery' })
+                body: JSON.stringify({ email: 'admin@example.com', password: 'correct-horse-battery' })
             })
         )
-        expect(signUpResponse.status).toBeLessThan(300)
-        const cookie = signUpResponse.headers
+        expect(signInResponse.status).toBeLessThan(300)
+        const cookie = signInResponse.headers
             .getSetCookie()
             .find((entry: string) => entry.includes('session_token'))
             ?.split(';')[0]
-        if (!cookie) throw new Error('expected a session cookie from sign-up')
+        if (!cookie) throw new Error('expected a session cookie from sign-in')
 
         // Mirrors what src/routes/login.tsx does after a successful sign-in: replay the exact
         // signed query string /login received back onto /oauth2/authorize.
@@ -105,6 +117,42 @@ describe('OAuth client flow (worker-admin against worker-oidc)', () => {
         const tokens = await tokenResponse.json<{ access_token: string; id_token: string }>()
         expect(tokens.access_token).toBeTruthy()
         expect(tokens.id_token).toBeTruthy()
+    })
+
+    it('rejects sign-up whose client_id is the registered worker-admin client', async ({ expect }) => {
+        const clientId = await registerWorkerAdminClient()
+
+        const signUpResponse = await callAsApp(
+            new Request('https://example.com/api/auth/sign-up/email', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    name: 'Sneaky',
+                    email: 'sneaky@example.com',
+                    password: 'correct-horse-battery',
+                    client_id: clientId
+                })
+            })
+        )
+        expect(signUpResponse.status).toBe(403)
+    })
+
+    it('does not block sign-up for a client_id other than worker-admin', async ({ expect }) => {
+        // No client registered under this id — proves the block is scoped to the real,
+        // registered worker-admin client_id rather than "any client_id present".
+        const signUpResponse = await callAsApp(
+            new Request('https://example.com/api/auth/sign-up/email', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    name: 'Other Client User',
+                    email: 'other-client-user@example.com',
+                    password: 'correct-horse-battery',
+                    client_id: 'some-other-client'
+                })
+            })
+        )
+        expect(signUpResponse.status).toBeLessThan(300)
     })
 
     it('resolves the requesting client name via public-client-prelogin', async ({ expect }) => {

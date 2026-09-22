@@ -1,8 +1,11 @@
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { jwt } from 'better-auth/plugins'
+import { eq } from 'drizzle-orm'
 import type { Db } from './db/client.js'
+import { oauthClient } from './db/schema.js'
 
 export function createAuth(db: Db, env: Env) {
     return betterAuth({
@@ -11,6 +14,21 @@ export function createAuth(db: Db, env: Env) {
         database: drizzleAdapter(db, { provider: 'sqlite' }),
         emailAndPassword: {
             enabled: true
+        },
+        hooks: {
+            // worker-admin doesn't self-register accounts — admins are onboarded via
+            // worker/bootstrap-admin-user.ts instead. Block only sign-ups whose oauth flow is
+            // for the worker-admin client specifically (matched against the real registered
+            // client_id, not a client-supplied name), so any other OAuth client added later
+            // keeps normal self-service sign-up. src/routes/signup.tsx sends client_id in the
+            // body for this to see.
+            before: createAuthMiddleware(async ctx => {
+                if (ctx.path !== '/sign-up/email') return
+                const [workerAdmin] = await db.select().from(oauthClient).where(eq(oauthClient.name, 'worker-admin')).limit(1)
+                if (workerAdmin && ctx.body?.client_id === workerAdmin.clientId) {
+                    throw new APIError('FORBIDDEN', { message: 'Sign-up is disabled for this application.' })
+                }
+            })
         },
         socialProviders: {
             google: {

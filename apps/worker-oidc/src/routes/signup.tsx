@@ -10,9 +10,9 @@ function SignupRoute() {
     const [clientName, setClientName] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const oauthQuery = window.location.search.slice(1)
+    const clientId = new URLSearchParams(window.location.search).get('client_id')
 
     useEffect(() => {
-        const clientId = new URLSearchParams(window.location.search).get('client_id')
         if (!clientId) return
         fetch('/api/auth/oauth2/public-client-prelogin', {
             method: 'POST',
@@ -22,7 +22,11 @@ function SignupRoute() {
             .then(response => (response.ok ? response.json() : null))
             .then((client: { client_name?: string } | null) => setClientName(client?.client_name ?? null))
             .catch(() => setClientName(null))
-    }, [oauthQuery])
+    }, [clientId, oauthQuery])
+
+    // worker-admin doesn't allow self-service sign-up (see worker/auth.ts's before hook) — hide
+    // the form instead of letting it fail on submit.
+    const signUpDisabled = clientName === 'worker-admin'
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
@@ -31,7 +35,7 @@ function SignupRoute() {
         const signUpResponse = await fetch('/api/auth/sign-up/email', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ name: form.get('name'), email: form.get('email'), password: form.get('password') })
+            body: JSON.stringify({ name: form.get('name'), email: form.get('email'), password: form.get('password'), client_id: clientId })
         })
         if (!signUpResponse.ok) {
             setError('Sign-up failed, please try again.')
@@ -48,6 +52,15 @@ function SignupRoute() {
         }
         const { url } = (await continueResponse.json()) as { url: string }
         window.location.href = url
+    }
+
+    if (signUpDisabled) {
+        return (
+            <div className="p-2">
+                <h3>Sign up to continue to {clientName}</h3>
+                <p>Self-service sign-up isn't available for this application. Ask an administrator for an account.</p>
+            </div>
+        )
     }
 
     return (
