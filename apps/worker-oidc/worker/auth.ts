@@ -12,10 +12,24 @@ export function createAuth(db: Db, env: Env) {
         emailAndPassword: {
             enabled: true
         },
+        // No self-service accounts: admins are seeded via worker/bootstrap-admin-user.ts
+        // (invite links are the planned longer-term mechanism). disabledPaths only gates the
+        // HTTP router (see node_modules/better-auth/dist/api/index.mjs's onRequest), so it 404s
+        // any caller reaching /sign-up/email over HTTP — including worker-admin's own flow —
+        // while auth.api.signUpEmail (what bootstrap-admin-user.ts calls) still works, since it
+        // never goes through the router. Better Auth's own emailAndPassword.disableSignUp flag
+        // would block that internal call too, since it's checked inside the endpoint handler
+        // itself rather than at the router.
+        disabledPaths: ['/sign-up/email'],
         socialProviders: {
             google: {
                 clientId: env.GOOGLE_CLIENT_ID,
-                clientSecret: env.GOOGLE_CLIENT_SECRET
+                clientSecret: env.GOOGLE_CLIENT_SECRET,
+                // Same "no self-service accounts" rule applies to Google sign-in, which would
+                // otherwise silently create a user on first login. A Google account with no
+                // matching existing user now gets redirected back with ?error=signup_disabled
+                // (src/GoogleButton.tsx) instead.
+                disableSignUp: true
             }
         },
         // 'https://example.com' matches the origin the test suite's synthetic requests use,
@@ -36,8 +50,7 @@ export function createAuth(db: Db, env: Env) {
             oauthProvider({
                 loginPage: '/login',
                 consentPage: '/consent',
-                signup: { page: '/signup' },
-                // Required for src/routes/{login,signup,consent}.tsx's client-name lookups
+                // Required for src/routes/{login,consent}.tsx's client-name lookups
                 // (POST /api/auth/oauth2/public-client-prelogin) to work at all — without this,
                 // @better-auth/oauth-provider's publicSessionMiddleware unconditionally throws
                 // BAD_REQUEST on that endpoint, and the pages silently fall back to showing the

@@ -31,10 +31,26 @@ async function registerWorkerAdminClient() {
     return client_id as string
 }
 
+// /sign-up/email is disabled entirely (see disabledPaths in worker/auth.ts) — an account has to
+// already exist, same as it would via a real worker/bootstrap-admin-user.ts call.
+async function seedAdminUser(email: string, password: string) {
+    const response = await callAsApp(
+        new Request('https://example.com/internal/users/bootstrap-admin', {
+            method: 'POST',
+            headers: { authorization: 'Bearer test-secret', 'content-type': 'application/json' },
+            body: JSON.stringify({ email, password, name: 'Test Admin' })
+        }),
+        { BETTER_AUTH_SECRET: 'test-secret' }
+    )
+    if (response.status !== 200) throw new Error(`failed to seed admin user: ${response.status}`)
+}
+
 describe('OAuth client flow (worker-admin against worker-oidc)', () => {
-    it('completes sign-up, consent, and token exchange for the registered public client', async ({ expect }) => {
+    it('completes sign-in, consent, and token exchange for the registered public client', async ({ expect }) => {
         const clientId = await registerWorkerAdminClient()
         const { codeVerifier, codeChallenge } = await generatePkcePair()
+
+        await seedAdminUser('admin@example.com', 'correct-horse-battery')
 
         const authorizeQuery = new URLSearchParams({
             response_type: 'code',
@@ -52,19 +68,19 @@ describe('OAuth client flow (worker-admin against worker-oidc)', () => {
         const loginRedirect = new URL(authorizeResponse.headers.get('location') ?? '', 'https://example.com')
         expect(loginRedirect.pathname).toBe('/login')
 
-        const signUpResponse = await callAsApp(
-            new Request('https://example.com/api/auth/sign-up/email', {
+        const signInResponse = await callAsApp(
+            new Request('https://example.com/api/auth/sign-in/email', {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ name: 'Test Admin', email: 'admin@example.com', password: 'correct-horse-battery' })
+                body: JSON.stringify({ email: 'admin@example.com', password: 'correct-horse-battery' })
             })
         )
-        expect(signUpResponse.status).toBeLessThan(300)
-        const cookie = signUpResponse.headers
+        expect(signInResponse.status).toBeLessThan(300)
+        const cookie = signInResponse.headers
             .getSetCookie()
             .find((entry: string) => entry.includes('session_token'))
             ?.split(';')[0]
-        if (!cookie) throw new Error('expected a session cookie from sign-up')
+        if (!cookie) throw new Error('expected a session cookie from sign-in')
 
         // Mirrors what src/routes/login.tsx does after a successful sign-in: replay the exact
         // signed query string /login received back onto /oauth2/authorize.
@@ -107,9 +123,20 @@ describe('OAuth client flow (worker-admin against worker-oidc)', () => {
         expect(tokens.id_token).toBeTruthy()
     })
 
+    it('sign-up is disabled entirely — /sign-up/email 404s regardless of caller', async ({ expect }) => {
+        const signUpResponse = await callAsApp(
+            new Request('https://example.com/api/auth/sign-up/email', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ name: 'Sneaky', email: 'sneaky@example.com', password: 'correct-horse-battery' })
+            })
+        )
+        expect(signUpResponse.status).toBe(404)
+    })
+
     it('resolves the requesting client name via public-client-prelogin', async ({ expect }) => {
         // Regression for allowPublicClientPrelogin: true in worker/auth.ts — without it this
-        // endpoint unconditionally 400s and src/routes/{login,signup,consent}.tsx silently fall
+        // endpoint unconditionally 400s and src/routes/{login,consent}.tsx silently fall
         // back to showing the raw client_id instead of the client's display name.
         const clientId = await registerWorkerAdminClient()
         const { codeChallenge } = await generatePkcePair()
