@@ -1,11 +1,8 @@
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { jwt } from 'better-auth/plugins'
-import { eq } from 'drizzle-orm'
 import type { Db } from './db/client.js'
-import { oauthClient } from './db/schema.js'
 
 export function createAuth(db: Db, env: Env) {
     return betterAuth({
@@ -15,25 +12,24 @@ export function createAuth(db: Db, env: Env) {
         emailAndPassword: {
             enabled: true
         },
-        hooks: {
-            // worker-admin doesn't self-register accounts — admins are onboarded via
-            // worker/bootstrap-admin-user.ts instead. Block only sign-ups whose oauth flow is
-            // for the worker-admin client specifically (matched against the real registered
-            // client_id, not a client-supplied name), so any other OAuth client added later
-            // keeps normal self-service sign-up. src/routes/signup.tsx sends client_id in the
-            // body for this to see.
-            before: createAuthMiddleware(async ctx => {
-                if (ctx.path !== '/sign-up/email') return
-                const [workerAdmin] = await db.select().from(oauthClient).where(eq(oauthClient.name, 'worker-admin')).limit(1)
-                if (workerAdmin && ctx.body?.client_id === workerAdmin.clientId) {
-                    throw new APIError('FORBIDDEN', { message: 'Sign-up is disabled for this application.' })
-                }
-            })
-        },
+        // No self-service accounts: admins are seeded via worker/bootstrap-admin-user.ts
+        // (invite links are the planned longer-term mechanism). disabledPaths only gates the
+        // HTTP router (see node_modules/better-auth/dist/api/index.mjs's onRequest), so it 404s
+        // any caller reaching /sign-up/email over HTTP — including worker-admin's own flow —
+        // while auth.api.signUpEmail (what bootstrap-admin-user.ts calls) still works, since it
+        // never goes through the router. Better Auth's own emailAndPassword.disableSignUp flag
+        // would block that internal call too, since it's checked inside the endpoint handler
+        // itself rather than at the router.
+        disabledPaths: ['/sign-up/email'],
         socialProviders: {
             google: {
                 clientId: env.GOOGLE_CLIENT_ID,
-                clientSecret: env.GOOGLE_CLIENT_SECRET
+                clientSecret: env.GOOGLE_CLIENT_SECRET,
+                // Same "no self-service accounts" rule applies to Google sign-in, which would
+                // otherwise silently create a user on first login. A Google account with no
+                // matching existing user now gets redirected back with ?error=signup_disabled
+                // (src/GoogleButton.tsx) instead.
+                disableSignUp: true
             }
         },
         // 'https://example.com' matches the origin the test suite's synthetic requests use,
@@ -54,7 +50,6 @@ export function createAuth(db: Db, env: Env) {
             oauthProvider({
                 loginPage: '/login',
                 consentPage: '/consent',
-                signup: { page: '/signup' },
                 // Required for src/routes/{login,signup,consent}.tsx's client-name lookups
                 // (POST /api/auth/oauth2/public-client-prelogin) to work at all — without this,
                 // @better-auth/oauth-provider's publicSessionMiddleware unconditionally throws

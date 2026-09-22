@@ -3,11 +3,10 @@ import type { Hono } from 'hono'
 import { createAuth } from './auth.js'
 import { createDb } from './db/client.js'
 
-// One-time (idempotent) manual call to seed the first admin account, since sign-up is disabled
-// for worker-admin (see the before hook in worker/auth.ts). Gated by BETTER_AUTH_SECRET, same
-// convention as register-worker-admin-client.ts. Calls signUpEmail directly (not the HTTP
-// /sign-up/email route) so it isn't affected by that hook — it never sends a client_id, and the
-// hook only blocks requests whose client_id matches the registered worker-admin client.
+// One-time (idempotent) manual call to seed an admin account, since /sign-up/email is disabled
+// entirely (see disabledPaths in worker/auth.ts). Gated by BETTER_AUTH_SECRET, same convention
+// as register-worker-admin-client.ts. Calls signUpEmail directly (not the HTTP /sign-up/email
+// route) so it isn't affected by disabledPaths, which only gates the HTTP router.
 //
 // curl -X POST http://localhost:8791/internal/users/bootstrap-admin \
 //     -H "Authorization: Bearer <BETTER_AUTH_SECRET>" \
