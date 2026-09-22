@@ -136,7 +136,7 @@ describe('OAuth client flow (worker-admin against worker-oidc)', () => {
 
     it('resolves the requesting client name via public-client-prelogin', async ({ expect }) => {
         // Regression for allowPublicClientPrelogin: true in worker/auth.ts — without it this
-        // endpoint unconditionally 400s and src/routes/{login,signup,consent}.tsx silently fall
+        // endpoint unconditionally 400s and src/routes/{login,consent}.tsx silently fall
         // back to showing the raw client_id instead of the client's display name.
         const clientId = await registerWorkerAdminClient()
         const { codeChallenge } = await generatePkcePair()
