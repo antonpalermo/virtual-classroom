@@ -42,7 +42,13 @@ export function createAuth(db: Db, env: Env) {
                 // @better-auth/oauth-provider's publicSessionMiddleware unconditionally throws
                 // BAD_REQUEST on that endpoint, and the pages silently fall back to showing the
                 // raw client_id instead of the client's display name.
-                allowPublicClientPrelogin: true
+                allowPublicClientPrelogin: true,
+                // Per OIDC Core §5.4, standard claims (email included) are normally delivered
+                // only via /userinfo, never the id_token. worker-admin decodes the id_token
+                // locally (@capstone/auth-verify) and never calls /userinfo, and its
+                // verifyAccessToken requires an `email` claim — so without this, every id_token
+                // fails that check and worker-admin bounces back to /login right after signing in.
+                customIdTokenClaims: ({ user, scopes }) => (scopes.includes('email') ? { email: user.email } : {})
             })
         ]
     })
