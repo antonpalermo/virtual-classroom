@@ -3,5 +3,5 @@
     "compilerOptions": {
         "tsBuildInfoFile": "../../node_modules/.tmp/client/tsconfig.app.tsbuildinfo"
     },
-    "include": ["src"]
+    "include": ["src", "test"]
 }

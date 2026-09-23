@@ -40,7 +40,7 @@ async function ensureBootstrapUser(db: Db) {
 
 // The idempotency check below (SELECT by name, then INSERT if absent) is a check-then-act race:
 // two concurrent calls can both pass the "not found" check and both attempt to insert a
-// `worker-admin` row. `oauthClient.name` carries a real unique index (`oauthClient_name_uidx`,
+// row with the same name. `oauthClient.name` carries a real unique index (`oauthClient_name_uidx`,
 // see db/schema.ts) so only one INSERT wins; the loser's `adminCreateOAuthClient` call surfaces
 // that failure as a `DrizzleQueryError` (drizzle-orm wraps the underlying D1 error) whose own
 // top-level `.message` is just `Failed query: insert into "oauth_client" ...` — the actual SQLite
@@ -62,16 +62,23 @@ function isDuplicateNameError(error: unknown): boolean {
     return false
 }
 
-// Registers worker-admin as a public OAuth client. Called once per environment via a manual
+const CLIENT_NAMES = new Set(['worker-admin', 'worker-client'])
+
+// Registers one of CLIENT_NAMES as a public OAuth client. Called once per environment via a manual
 // curl (see apps/worker-admin/CLAUDE.md), never at runtime by a client itself — that's why this
 // goes through the plugin's SERVER_ONLY adminCreateOAuthClient API rather than dynamic client
 // registration. Idempotent: re-running it returns the existing client_id instead of creating a
 // duplicate row, so it's safe to call again if you're not sure whether it already ran — including
 // when two calls race each other concurrently (see isDuplicateNameError above).
 export function registerBootstrapRoute(app: Hono<{ Bindings: Env }>) {
-    app.post('/internal/oauth-clients/worker-admin', async c => {
+    app.post('/internal/oauth-clients/:name', async c => {
         if (c.req.header('authorization') !== `Bearer ${c.env.BETTER_AUTH_SECRET}`) {
             return c.text('Unauthorized', 401)
+        }
+
+        const name = c.req.param('name')
+        if (!CLIENT_NAMES.has(name)) {
+            return c.text('Unknown client', 404)
         }
 
         const redirectUri = c.req.query('redirect_uri')
@@ -80,7 +87,7 @@ export function registerBootstrapRoute(app: Hono<{ Bindings: Env }>) {
         }
 
         const db = createDb(c.env.OIDC_DB)
-        const [existing] = await db.select().from(oauthClient).where(eq(oauthClient.name, 'worker-admin')).limit(1)
+        const [existing] = await db.select().from(oauthClient).where(eq(oauthClient.name, name)).limit(1)
         if (existing) {
             return c.json({ client_id: existing.clientId })
         }
@@ -105,11 +112,11 @@ export function registerBootstrapRoute(app: Hono<{ Bindings: Env }>) {
             const client = await auth.api.adminCreateOAuthClient({
                 headers: new Headers(),
                 body: {
-                    client_name: 'worker-admin',
+                    client_name: name,
                     redirect_uris: [redirectUri],
                     token_endpoint_auth_method: 'none',
-                    // 'native', not 'web': worker-admin's real local-dev redirect URI is
-                    // http://localhost:8790/auth-callback (loopback + http). In
+                    // 'native', not 'web': the clients' real local-dev redirect URIs are loopback +
+                    // http (e.g. http://localhost:8790/auth-callback). In
                     // validateClientRedirectUri (node_modules/@better-auth/oauth-provider/dist/
                     // authorize-Crqw4_bR.mjs:1698-1701), 'web' unconditionally rejects loopback
                     // hosts even over https, so this would 500 on any real local-dev registration.
@@ -117,7 +124,7 @@ export function registerBootstrapRoute(app: Hono<{ Bindings: Env }>) {
                     // covering both our local-dev and production redirect URI shapes. Per the
                     // plugin's OAuthClient type docs, application_type only governs redirect-URI
                     // validation policy — it has no effect on client auth, PKCE, or
-                    // token_endpoint_auth_method, so worker-admin remains a public PKCE client.
+                    // token_endpoint_auth_method, so the client remains a public PKCE client.
                     application_type: 'native',
                     skip_consent: false,
                     grant_types: ['authorization_code'],
@@ -133,7 +140,7 @@ export function registerBootstrapRoute(app: Hono<{ Bindings: Env }>) {
 
             // Lost the race: another concurrent call's INSERT won. Re-read the row it created
             // and return its client_id instead — same success shape as the non-racing path.
-            const [winner] = await db.select().from(oauthClient).where(eq(oauthClient.name, 'worker-admin')).limit(1)
+            const [winner] = await db.select().from(oauthClient).where(eq(oauthClient.name, name)).limit(1)
             if (!winner) {
                 throw error
             }

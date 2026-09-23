@@ -43,8 +43,8 @@ This registers (or, if already registered, just looks up) a public, PKCE-require
 - `preview` — `npm run build && vite preview`
 - `deploy` — `npm run build && wrangler deploy` (uploads the built static assets only — there's no Worker logic to deploy)
 - `typegen` — `wrangler types` (regenerates `worker-configuration.d.ts`)
-- `test` / `test:run` — plain Vitest (`vitest.config.mjs` is an empty config — no `@cloudflare/vitest-pool-workers`, since there's no Worker runtime code left to test against). Only `src/lib/pkce.test.ts` exists today, covering `createPkcePair()`'s shape and the S256 challenge derivation.
+- `test` / `test:run` — plain Vitest (`vitest.config.mjs` is an empty config — no `@cloudflare/vitest-pool-workers`, since there's no Worker runtime code left to test against). Only `test/pkce.test.ts` exists today, covering `createPkcePair()`'s shape and the S256 challenge derivation.
 
 ## TypeScript config
 
-`tsconfig.json` is a references-only shell pointing at `tsconfig.app.json` (browser/React code under `src/`) and `tsconfig.node.json` (`vite.config.ts`) — both extending the shared bases in `@capstone/typescript/configs/` (see `packages/config-typescript/CLAUDE.md`). There is no `tsconfig.worker.json` anymore — with the backend Worker deleted, there's no code left that types against `worker-configuration.d.ts` (the `typegen` script still regenerates it, but nothing under `src/` currently imports `Env` or any other type from it).
+`tsconfig.json` is a references-only shell pointing at `tsconfig.app.json` (browser/React code under `src/`, plus `test/`) and `tsconfig.node.json` (`vite.config.ts`) — both extending the shared bases in `@capstone/typescript/configs/` (see `packages/config-typescript/CLAUDE.md`). There is no `tsconfig.worker.json` anymore — with the backend Worker deleted, there's no code left that types against `worker-configuration.d.ts` (the `typegen` script still regenerates it, but nothing under `src/` currently imports `Env` or any other type from it).

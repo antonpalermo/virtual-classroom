@@ -7,7 +7,7 @@ import { user as userTable } from './db/schema.js'
 
 // One-time (idempotent) manual call to seed an admin account, since /sign-up/email is disabled
 // entirely (see disabledPaths in worker/auth.ts). Gated by BETTER_AUTH_SECRET, same convention
-// as register-worker-admin-client.ts. Calls signUpEmail directly (not the HTTP /sign-up/email
+// as register-oauth-client.ts. Calls signUpEmail directly (not the HTTP /sign-up/email
 // route) so it isn't affected by disabledPaths, which only gates the HTTP router.
 //
 // curl -X POST http://localhost:8791/internal/users/bootstrap-admin \
@@ -43,7 +43,7 @@ export function registerBootstrapAdminUserRoute(app: Hono<{ Bindings: Env }>) {
         } catch (error) {
             // USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL — treat re-running this against an
             // already-seeded environment as a no-op success, same idempotency shape as
-            // register-worker-admin-client.ts. Checked via error.body.code (not just
+            // register-oauth-client.ts. Checked via error.body.code (not just
             // error.status === 'UNPROCESSABLE_ENTITY'): better-auth's sign-up handler also
             // throws that same status for FAILED_TO_CREATE_USER (e.g. a genuine DB failure —
             // see node_modules/better-auth/dist/api/routes/sign-up.mjs), which the broader

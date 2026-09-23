@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { describe, it } from 'vitest'
 import { createDb } from '../worker/db/client.js'
 import { oauthClient, user } from '../worker/db/schema.js'
-import { BOOTSTRAP_USER_EMAIL, BOOTSTRAP_USER_ID } from '../worker/register-worker-admin-client.js'
+import { BOOTSTRAP_USER_EMAIL, BOOTSTRAP_USER_ID } from '../worker/register-oauth-client.js'
 import { callAsApp } from './helpers/call-app.js'
 
 const REDIRECT_URI = 'https://admin.example.test/auth-callback'
@@ -15,7 +15,7 @@ function bootstrapRequest(secret = 'test-secret') {
     })
 }
 
-describe('POST /internal/oauth-clients/worker-admin', () => {
+describe('POST /internal/oauth-clients/:name', () => {
     it('rejects a request with the wrong bearer secret', async ({ expect }) => {
         const response = await callAsApp(bootstrapRequest('wrong-secret'), { BETTER_AUTH_SECRET: 'test-secret' })
         expect(response.status).toBe(401)
@@ -30,6 +30,36 @@ describe('POST /internal/oauth-clients/worker-admin', () => {
             { BETTER_AUTH_SECRET: 'test-secret' }
         )
         expect(response.status).toBe(400)
+    })
+
+    it('rejects a client name outside the allowlist', async ({ expect }) => {
+        const response = await callAsApp(
+            new Request(`https://example.com/internal/oauth-clients/evil?redirect_uri=${encodeURIComponent(REDIRECT_URI)}`, {
+                method: 'POST',
+                headers: { authorization: 'Bearer test-secret' }
+            }),
+            { BETTER_AUTH_SECRET: 'test-secret' }
+        )
+        expect(response.status).toBe(404)
+    })
+
+    it('registers worker-client as a separate client from worker-admin', async ({ expect }) => {
+        const admin = await callAsApp(bootstrapRequest(), { BETTER_AUTH_SECRET: 'test-secret' })
+        const client = await callAsApp(
+            new Request(
+                `https://example.com/internal/oauth-clients/worker-client?redirect_uri=${encodeURIComponent('http://localhost:5173/auth-callback')}`,
+                {
+                    method: 'POST',
+                    headers: { authorization: 'Bearer test-secret' }
+                }
+            ),
+            { BETTER_AUTH_SECRET: 'test-secret' }
+        )
+        expect(client.status).toBe(200)
+        const { client_id: adminId } = await admin.json<{ client_id: string }>()
+        const { client_id: clientId } = await client.json<{ client_id: string }>()
+        expect(clientId).toBeTruthy()
+        expect(clientId).not.toBe(adminId)
     })
 
     it('registers a public, PKCE-required, consent-requiring client', async ({ expect }) => {
@@ -97,7 +127,7 @@ describe('POST /internal/oauth-clients/worker-admin', () => {
         // worker-admin's real local-dev redirect URI (see apps/worker-admin/CLAUDE.md): loopback
         // host + http. Under application_type: 'web' this is unconditionally rejected even over
         // https, which is the bug this test guards against — see the comment on
-        // `application_type: 'native'` in src/register-worker-admin-client.ts.
+        // `application_type: 'native'` in worker/register-oauth-client.ts.
         const loopbackRedirectUri = 'http://localhost:8790/auth-callback'
         const response = await callAsApp(
             new Request(`https://example.com/internal/oauth-clients/worker-admin?redirect_uri=${encodeURIComponent(loopbackRedirectUri)}`, {

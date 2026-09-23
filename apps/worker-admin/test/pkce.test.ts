@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createPkcePair } from './pkce'
+import { createPkcePair } from '../src/lib/pkce'
 
 describe('createPkcePair', () => {
     it('generates a URL-safe code_verifier and its S256 code_challenge', async () => {
