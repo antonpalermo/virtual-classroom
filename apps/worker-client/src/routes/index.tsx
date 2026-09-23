@@ -1,10 +1,10 @@
 import { type AccessTokenClaims, verifyAccessToken } from '@capstone/auth-verify'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { clearStoredSession, getStoredSession, getStoredToken } from '../lib/session'
+import { clearStoredJwt, getStoredJwt } from '../lib/auth-client'
 
-const AUTH_ORIGIN = import.meta.env.VITE_AUTH_ORIGIN ?? 'http://localhost:8789'
-const JWKS_URL = `${AUTH_ORIGIN}/api/auth/jwks`
+const OIDC_ORIGIN = import.meta.env.VITE_OIDC_ORIGIN ?? 'http://localhost:8791'
+const JWKS_URL = `${OIDC_ORIGIN}/api/auth/jwks`
 
 export const Route = createFileRoute('/')({
     component: HomeRoute
@@ -15,7 +15,7 @@ function HomeRoute() {
     const [claims, setClaims] = useState<AccessTokenClaims | null | undefined>(undefined)
 
     useEffect(() => {
-        const token = getStoredToken()
+        const token = getStoredJwt()
         if (!token) {
             setClaims(null)
             return
@@ -31,15 +31,7 @@ function HomeRoute() {
     }
 
     function signOut() {
-        const session = getStoredSession()
-        // Best-effort: local sign-out must always succeed even if this fails, so it's not awaited.
-        if (session) {
-            fetch(`${AUTH_ORIGIN}/api/auth/sign-out`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${session}` }
-            }).catch(() => {})
-        }
-        clearStoredSession()
+        clearStoredJwt()
         setClaims(null)
     }
 
