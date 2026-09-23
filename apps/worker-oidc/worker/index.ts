@@ -3,15 +3,15 @@ import { cors } from 'hono/cors'
 import { createAuth } from './auth.js'
 import { registerBootstrapAdminUserRoute } from './bootstrap-admin-user.js'
 import { createDb } from './db/client.js'
-import { registerBootstrapRoute } from './register-worker-admin-client.js'
+import { registerBootstrapRoute } from './register-oauth-client.js'
 
 const app = new Hono<{ Bindings: Env }>()
 
 registerBootstrapRoute(app)
 registerBootstrapAdminUserRoute(app)
 
-// These three are called directly, cross-origin, from worker-admin's browser JS (no service
-// binding involved) — a public JWKS, a userinfo lookup gated by the caller's own access token,
+// These three are called directly, cross-origin, from worker-admin's and worker-client's browser
+// JS (no service binding involved) — a public JWKS, a userinfo lookup gated by the caller's own access token,
 // and a token exchange gated by the caller's own authorization code + PKCE verifier. None of
 // them are guarded by a cookie, so opening CORS wide doesn't leak anything the caller didn't
 // already have. Same reasoning worker-auth already applied to its own /api/auth/jwks.
