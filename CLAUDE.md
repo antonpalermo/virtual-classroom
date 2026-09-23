@@ -10,14 +10,14 @@ A virtual classroom / video conferencing app built entirely on Cloudflare Worker
 
 - `apps/worker-client` (`@capstone/client`) — the frontend. See [apps/worker-client/CLAUDE.md](apps/worker-client/CLAUDE.md).
 - `apps/worker-realtime` (`@capstone/realtime`) — the realtime signaling backend (`Messenger` Durable Object). See [apps/worker-realtime/CLAUDE.md](apps/worker-realtime/CLAUDE.md).
-- `apps/worker-auth` (`@capstone/auth`) — the identity worker: Google sign-in/sign-up and the OAuth provider other apps will link against. See [apps/worker-auth/CLAUDE.md](apps/worker-auth/CLAUDE.md).
-- `apps/worker-admin` (`@capstone/admin`) — the admin worker: user management and role assignment, proxied through to `worker-auth`. See [apps/worker-admin/CLAUDE.md](apps/worker-admin/CLAUDE.md).
-- `apps/worker-oidc` (`@capstone/openid-connect`) — email/password (D1 via Drizzle) plus Better Auth's `oauthProvider` plugin; a working OIDC provider with no clients registered yet. See [apps/worker-oidc/CLAUDE.md](apps/worker-oidc/CLAUDE.md).
+- `apps/worker-auth` (`@capstone/auth`) — the identity worker: Google sign-in/sign-up and the OAuth provider other apps will link against. No app signs in through it anymore — `worker-client` and `worker-admin` both use `worker-oidc`. See [apps/worker-auth/CLAUDE.md](apps/worker-auth/CLAUDE.md).
+- `apps/worker-admin` (`@capstone/admin`) — the admin worker: a static SPA signing in against `worker-oidc` (user management deferred). See [apps/worker-admin/CLAUDE.md](apps/worker-admin/CLAUDE.md).
+- `apps/worker-oidc` (`@capstone/openid-connect`) — the identity worker: email/password + Google (D1 via Drizzle) plus Better Auth's `oauthProvider` plugin; the OIDC provider `worker-client` and `worker-admin` sign in against. See [apps/worker-oidc/CLAUDE.md](apps/worker-oidc/CLAUDE.md).
 - `packages/web-standards` (`@capstone/standards`) — generated HTTP status code/phrase constants. See [packages/web-standards/CLAUDE.md](packages/web-standards/CLAUDE.md).
 - `packages/config-typescript` (`@capstone/typescript`) — shared base `tsconfig` files. See [packages/config-typescript/CLAUDE.md](packages/config-typescript/CLAUDE.md).
-- `packages/lib-auth-verify` (`@capstone/auth-verify`) — verifies a worker-auth-issued JWT against its JWKS endpoint; consumed by `worker-client` and `worker-admin`. See [packages/lib-auth-verify/CLAUDE.md](packages/lib-auth-verify/CLAUDE.md).
+- `packages/lib-auth-verify` (`@capstone/auth-verify`) — verifies a worker-oidc-issued JWT against its JWKS endpoint; consumed by `worker-client` and `worker-admin`. See [packages/lib-auth-verify/CLAUDE.md](packages/lib-auth-verify/CLAUDE.md).
 
-The four apps are independent Cloudflare Workers deployed separately. `worker-client` and `worker-admin` each talk to `worker-auth` via their own service binding (`AUTH_SERVICE`, proxying `/api/auth/*`) — see [apps/worker-client/CLAUDE.md](apps/worker-client/CLAUDE.md), [apps/worker-admin/CLAUDE.md](apps/worker-admin/CLAUDE.md), and [apps/worker-auth/CLAUDE.md](apps/worker-auth/CLAUDE.md). `worker-realtime` has no service bindings yet.
+The five apps are independent Cloudflare Workers deployed separately. `worker-client` and `worker-admin` are static SPAs that each sign in against `worker-oidc` as their own public OAuth client (Authorization Code + PKCE, straight from the browser — no service bindings) — see [apps/worker-client/CLAUDE.md](apps/worker-client/CLAUDE.md), [apps/worker-admin/CLAUDE.md](apps/worker-admin/CLAUDE.md), and [apps/worker-oidc/CLAUDE.md](apps/worker-oidc/CLAUDE.md). `worker-realtime` has no service bindings yet.
 
 ## Generated files — never Read in full
 
@@ -46,7 +46,9 @@ npm run version-packages  # changeset version (apply pending bumps + changelogs;
 
 Scope any of the turbo-backed scripts to one workspace with `--filter`, e.g. `turbo run dev --filter=@capstone/client` or `turbo run build --filter=@capstone/realtime`. Per-app commands are documented in each workspace's own `CLAUDE.md`.
 
-There is no repo-wide test runner configured in `turbo.json` yet. Individual workspaces have their own test suites — for example, `apps/worker-auth` runs Vitest (see [apps/worker-auth/CLAUDE.md](apps/worker-auth/CLAUDE.md)'s Testing section).
+All test files live under the workspace's own `test/` directory (e.g. `apps/worker-client/test/pkce.test.ts`), never colocated next to source under `src/` or `worker/`.
+
+There is no repo-wide test runner configured in `turbo.json` yet. Individual workspaces have their own test suites — for example, `apps/worker-oidc` runs Vitest (see [apps/worker-oidc/CLAUDE.md](apps/worker-oidc/CLAUDE.md)'s Commands section).
 
 Formatting/linting is done entirely by **Biome** (`biome.json`, 4-space indent, single quotes, no semicolons, no trailing commas, 140 col width) for the whole repo, including React-specific rules (hooks, refresh) in `apps/worker-client` via the `react` linter domain — there is no ESLint in this repo. `npm run lint` runs `biome check .` per workspace via Turborepo. Biome also runs via `lint-staged` on every commit through Husky (`.husky/pre-commit` → `npx lint-staged`), which runs `biome check --write` on all staged files — don't hand-format code in a style Biome would rewrite.
 
