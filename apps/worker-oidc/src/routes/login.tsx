@@ -6,9 +6,16 @@ export const Route = createFileRoute('/login')({
     component: LoginRoute
 })
 
+// worker/restrict-worker-admin-client.ts sends this back here for either sign-in method when a
+// signed-in non-admin tries to complete worker-admin's OAuth flow.
+function loginError() {
+    const code = new URLSearchParams(window.location.search).get('error')
+    return code === 'not_authorized' ? "This account isn't authorized to sign in here." : null
+}
+
 function LoginRoute() {
     const [clientName, setClientName] = useState<string | null>(null)
-    const [error, setError] = useState<string | null>(null)
+    const [error, setError] = useState<string | null>(loginError)
     const oauthQuery = window.location.search.slice(1)
 
     useEffect(() => {
@@ -37,7 +44,11 @@ function LoginRoute() {
             setError('Sign-in failed, please try again.')
             return
         }
-        window.location.href = `/api/auth/oauth2/authorize?${oauthQuery}`
+        // Strip a stale ?error= (e.g. from a prior not_authorized bounce) before resuming —
+        // same reasoning GoogleButton.tsx applies to its own reused query.
+        const params = new URLSearchParams(oauthQuery)
+        params.delete('error')
+        window.location.href = `/api/auth/oauth2/authorize?${params.toString()}`
     }
 
     return (

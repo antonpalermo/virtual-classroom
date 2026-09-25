@@ -4,7 +4,12 @@ import { createDb } from '../../worker/db/client.js'
 import { user as userTable } from '../../worker/db/schema.js'
 import { callAsApp } from './call-app.js'
 
-const REDIRECT_URI = 'https://admin.example.test/auth-callback'
+// Uses the worker-client OAuth client, not worker-admin — this helper's job is getting a real,
+// verifiable id_token for any user (admin or not), and worker-admin's own authorize flow now
+// rejects a non-admin before it ever reaches consent/token (see
+// worker/restrict-worker-admin-client.ts). worker-client stays open to any signed-in user, so it
+// doesn't collide with tests that specifically need a plain, non-admin user's token.
+const REDIRECT_URI = 'https://client.example.test/auth-callback'
 
 // Same helper apps/worker-auth/test/oauth-provider.test.ts and oauth-client-flow.test.ts use —
 // registered clients default to require_pkce: true, so a real authorization-code flow needs a
@@ -23,9 +28,9 @@ async function generatePkcePair() {
     return { codeVerifier, codeChallenge }
 }
 
-async function registerWorkerAdminClient() {
+async function registerWorkerClient() {
     const response = await callAsApp(
-        new Request(`https://example.com/internal/oauth-clients/worker-admin?redirect_uri=${encodeURIComponent(REDIRECT_URI)}`, {
+        new Request(`https://example.com/internal/oauth-clients/worker-client?redirect_uri=${encodeURIComponent(REDIRECT_URI)}`, {
             method: 'POST',
             headers: { authorization: 'Bearer test-secret' }
         }),
@@ -63,7 +68,7 @@ export async function seedUser(email: string, password: string, opts: { role?: s
 // oauth-client-flow.test.ts exercises manually) and returns the issued tokens, so tests needing a
 // real, verifiable id_token don't each have to reimplement the OAuth dance.
 export async function signInForTokens(email: string, password: string) {
-    const clientId = await registerWorkerAdminClient()
+    const clientId = await registerWorkerClient()
     const { codeVerifier, codeChallenge } = await generatePkcePair()
 
     const authorizeQuery = new URLSearchParams({
