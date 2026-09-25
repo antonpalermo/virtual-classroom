@@ -7,6 +7,12 @@ export const user = sqliteTable('user', {
     email: text('email').notNull().unique(),
     emailVerified: integer('email_verified', { mode: 'boolean' }).default(false).notNull(),
     image: text('image'),
+    // Hand-added, not part of the better-auth CLI's generated shape (we deliberately don't enable
+    // the `admin` plugin — see worker/admin-users.ts) — kept here rather than regenerated.
+    role: text('role').default('user').notNull(),
+    banned: integer('banned', { mode: 'boolean' }).default(false).notNull(),
+    banReason: text('ban_reason'),
+    banExpires: integer('ban_expires', { mode: 'timestamp_ms' }),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
         .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
@@ -276,13 +282,38 @@ export const oauthClientAssertion = sqliteTable('oauth_client_assertion', {
     expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
 })
 
+// Backs the admin-CRUD account-creation flow (worker/admin-users.ts + worker/accept-invite.ts).
+// Deliberately separate from Better Auth's own `verification` table so we don't fight its
+// internal token semantics (that table's shape/lifecycle is owned by better-auth itself).
+export const invite = sqliteTable(
+    'invite',
+    {
+        token: text('token').primaryKey(),
+        userId: text('user_id')
+            .notNull()
+            .references(() => user.id, { onDelete: 'cascade' }),
+        expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+        usedAt: integer('used_at', { mode: 'timestamp_ms' }),
+        createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`).notNull()
+    },
+    table => [index('invite_userId_idx').on(table.userId)]
+)
+
 export const userRelations = relations(user, ({ many }) => ({
     sessions: many(session),
     accounts: many(account),
     oauthClients: many(oauthClient),
     oauthRefreshTokens: many(oauthRefreshToken),
     oauthAccessTokens: many(oauthAccessToken),
-    oauthConsents: many(oauthConsent)
+    oauthConsents: many(oauthConsent),
+    invites: many(invite)
+}))
+
+export const inviteRelations = relations(invite, ({ one }) => ({
+    user: one(user, {
+        fields: [invite.userId],
+        references: [user.id]
+    })
 }))
 
 export const sessionRelations = relations(session, ({ one, many }) => ({
