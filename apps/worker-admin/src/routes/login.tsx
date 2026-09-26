@@ -22,7 +22,14 @@ function LoginRoute() {
             scope: 'openid email profile',
             code_challenge: codeChallenge,
             code_challenge_method: 'S256',
-            state
+            state,
+            // This worker keeps no session of its own — signing out only clears the JWT in
+            // sessionStorage (src/routes/index.tsx's signOut) — so without this, a still-live
+            // worker-oidc session cookie from a *different* user's earlier sign-in gets silently
+            // reused: clicking "Sign in" skips straight to a code for whoever that cookie
+            // belongs to, with no chance to authenticate as anyone else. `prompt=login` forces
+            // worker-oidc to ask fresh every time, regardless of any existing session.
+            prompt: 'login'
         })
         window.location.href = `${OIDC_ORIGIN}/api/auth/oauth2/authorize?${params.toString()}`
     }
