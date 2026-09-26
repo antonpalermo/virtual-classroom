@@ -3,7 +3,9 @@ import { useState } from 'react'
 // Better Auth redirects back to errorCallbackURL with ?error=<code> when the Google leg fails.
 function callbackError() {
     const code = new URLSearchParams(window.location.search).get('error')
-    if (!code) return null
+    // not_authorized isn't Google-specific — worker/restrict-worker-admin-client.ts sends it here
+    // for either sign-in method, and login.tsx owns showing it (see loginError() there).
+    if (!code || code === 'not_authorized') return null
     if (code === 'account_not_linked') return 'An account with this email already exists. Sign in with your password instead.'
     if (code === 'signup_disabled') return 'No account found for this Google account. Ask an administrator for access.'
     return 'Google sign-in failed, please try again.'

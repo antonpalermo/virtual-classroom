@@ -1,4 +1,8 @@
+import { env } from 'cloudflare:workers'
+import { eq } from 'drizzle-orm'
 import { describe, it } from 'vitest'
+import { createDb } from '../worker/db/client.js'
+import { user } from '../worker/db/schema.js'
 import { callAsApp } from './helpers/call-app.js'
 
 const REDIRECT_URI = 'https://admin.example.test/auth-callback'
@@ -33,6 +37,12 @@ async function registerWorkerAdminClient() {
 
 // /sign-up/email is disabled entirely (see disabledPaths in worker/auth.ts) — an account has to
 // already exist, same as it would via a real worker/bootstrap-admin-user.ts call.
+//
+// "Admin" here is the bootstrap-script sense (the operator seeding the very first account), not
+// the role column worker/restrict-worker-admin-client.ts checks — those are different concepts
+// that happen to share a name. bootstrap-admin-user.ts doesn't set role (defaults to 'user'), so
+// this test's own account needs elevating too, or its worker-admin flow would now be rejected by
+// that gate before ever reaching /consent.
 async function seedAdminUser(email: string, password: string) {
     const response = await callAsApp(
         new Request('https://example.com/internal/users/bootstrap-admin', {
@@ -43,6 +53,8 @@ async function seedAdminUser(email: string, password: string) {
         { BETTER_AUTH_SECRET: 'test-secret' }
     )
     if (response.status !== 200) throw new Error(`failed to seed admin user: ${response.status}`)
+    const db = createDb(env.OIDC_DB)
+    await db.update(user).set({ role: 'admin' }).where(eq(user.email, email))
 }
 
 describe('OAuth client flow (worker-admin against worker-oidc)', () => {

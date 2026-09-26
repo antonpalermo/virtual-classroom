@@ -46,6 +46,11 @@ function DashboardRoute() {
     return (
         <div className="p-2">
             <p>Signed in as {claims?.email}</p>
+            {claims?.role === 'admin' && (
+                <p>
+                    <a href="/users">Manage users</a>
+                </p>
+            )}
             <button type="button" onClick={signOut}>
                 Sign out
             </button>

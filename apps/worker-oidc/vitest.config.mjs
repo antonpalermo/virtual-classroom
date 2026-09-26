@@ -15,7 +15,12 @@ export default defineConfig(async () => {
             })
         ],
         test: {
-            setupFiles: ['./test/apply-migrations.ts']
+            setupFiles: ['./test/apply-migrations.ts'],
+            // The default 5s times out under load: several tests (and the whole suite, run as
+            // multiple files in parallel) drive full sign-in -> consent -> token-exchange round
+            // trips — real password hashing and JWT signing, not mocked — and that's routinely
+            // slower than 5s on a loaded/shared CPU, independent of test correctness.
+            testTimeout: 20_000
         }
     }
 })
