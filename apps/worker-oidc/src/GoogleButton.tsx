@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { buildAuthorizeResumeQuery } from './lib/resume-authorize-query'
 
 // Better Auth redirects back to errorCallbackURL with ?error=<code> when the Google leg fails.
 function callbackError() {
@@ -28,8 +29,17 @@ export function GoogleButton({ oauthQuery }: { oauthQuery: string }) {
                 headers: { 'content-type': 'application/json' },
                 body: JSON.stringify({
                     provider: 'google',
-                    callbackURL: `/api/auth/oauth2/authorize?${flowQuery}`,
+                    // Resumes /api/auth/oauth2/authorize once Google succeeds — prompt=login is
+                    // already satisfied at that point, so it's stripped here (see
+                    // resume-authorize-query.ts) to avoid looping back to /login forever.
+                    callbackURL: `/api/auth/oauth2/authorize?${buildAuthorizeResumeQuery(flowQuery)}`,
+                    // Re-lands on /login after a failed Google attempt — prompt is deliberately
+                    // kept here (via flowQuery, not the stripped version) so a retry still forces
+                    // fresh authentication.
                     errorCallbackURL: `${window.location.pathname}?${flowQuery}`,
+                    // Sent as a signed blob Better Auth verifies byte-for-byte against its own
+                    // signature — must stay exactly flowQuery, never the prompt-stripped version,
+                    // or the call fails with invalid_signature (confirmed live).
                     oauth_query: flowQuery
                 })
             })
