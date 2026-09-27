@@ -1,5 +1,16 @@
 # @capstone/client
 
+## 0.2.0
+
+### Minor Changes
+
+- ed5a785: worker-client now signs in against worker-oidc (Authorization Code + PKCE) and no longer has a backend Worker or `AUTH_SERVICE` binding; worker-oidc's client bootstrap route is now `/internal/oauth-clients/:name` and accepts `worker-client` alongside `worker-admin`.
+
+### Patch Changes
+
+- Updated dependencies [c361a77]
+    - @capstone/auth-verify@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes
