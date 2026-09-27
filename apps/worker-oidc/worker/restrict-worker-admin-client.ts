@@ -12,7 +12,8 @@ import { oauthClient } from './db/schema.js'
 // can't be routed around via consent or token exchange — no code is ever issued to reach them.
 export function registerWorkerAdminAuthorizeGate(app: Hono<{ Bindings: Env }>) {
     app.use('/api/auth/oauth2/authorize', async (c, next) => {
-        const clientId = new URL(c.req.url).searchParams.get('client_id')
+        const url = new URL(c.req.url)
+        const clientId = url.searchParams.get('client_id')
         if (!clientId) return next()
 
         const db = createDb(c.env.OIDC_DB)
@@ -20,6 +21,17 @@ export function registerWorkerAdminAuthorizeGate(app: Hono<{ Bindings: Env }>) {
         // Scoped to the worker-admin client only — worker-client's own authorize flow (and any
         // future client) is untouched.
         if (client?.name !== 'worker-admin') return next()
+
+        // worker-admin's own login.tsx always sends prompt=login, precisely so a still-live
+        // session from a *different* user's earlier sign-in doesn't get silently reused (see that
+        // file's own comment). Better Auth's authorize handler already forces a fresh /login for
+        // prompt=login/create unconditionally, regardless of any existing session — deferring to
+        // it here means the *resumed* call, once that prompt is satisfied (and stripped from the
+        // query), is what gets role-checked below, not the stale session that triggered it.
+        // Without this, a non-admin's leftover cookie got rejected outright before the visitor —
+        // or a different, possibly admin, user on the same browser — ever saw a login page.
+        const promptedForFreshLogin = (url.searchParams.get('prompt') ?? '').split(' ').some(p => p === 'login' || p === 'create')
+        if (promptedForFreshLogin) return next()
 
         const auth = createAuth(db, c.env)
         const result = await auth.api.getSession({ headers: c.req.raw.headers })
