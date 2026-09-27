@@ -22,7 +22,7 @@ function base64url(bytes: ArrayBuffer) {
         .replace(/=+$/, '')
 }
 
-async function authorizeUrl(clientId: string, redirectUri: string) {
+async function authorizeUrl(clientId: string, redirectUri: string, opts: { prompt?: string } = {}) {
     const codeVerifier = base64url(crypto.getRandomValues(new Uint8Array(32)).buffer)
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier))
     const codeChallenge = base64url(digest)
@@ -33,7 +33,8 @@ async function authorizeUrl(clientId: string, redirectUri: string) {
         scope: 'openid email profile',
         code_challenge: codeChallenge,
         code_challenge_method: 'S256',
-        state: 'test-state'
+        state: 'test-state',
+        ...(opts.prompt ? { prompt: opts.prompt } : {})
     }).toString()
     return `https://example.com/api/auth/oauth2/authorize?${query}`
 }
@@ -96,6 +97,29 @@ describe('restricting worker-admin sign-in to admins', () => {
         expect(response.status).toBeLessThan(400)
         const location = new URL(response.headers.get('location') ?? '', 'https://example.com')
         expect(location.pathname).toBe('/consent')
+    })
+
+    it('lets prompt=login reach the real /login page even with a stale non-admin session, instead of rejecting outright', async ({
+        expect
+    }) => {
+        // Reproduces: worker-admin's login.tsx always sends prompt=login (to force fresh
+        // authentication regardless of any existing worker-oidc session — see
+        // apps/worker-admin/src/routes/login.tsx). Without this, a stale non-admin session
+        // cookie from an earlier sign-in got rejected by this gate before Better Auth's own
+        // prompt=login handling ever had a chance to show a real login page — leaving no path
+        // for a *different* (possibly admin) user to sign in on the same browser.
+        const clientId = await registerClient('worker-admin', 'https://admin.example.test/auth-callback')
+        await seedUser('stale-session@example.com', 'correct-horse-battery')
+        const cookie = await signInAndGetCookie('stale-session@example.com', 'correct-horse-battery')
+
+        const url = await authorizeUrl(clientId, 'https://admin.example.test/auth-callback', { prompt: 'login' })
+        const response = await callAsApp(new Request(url, { headers: { cookie } }))
+
+        expect(response.status).toBeGreaterThanOrEqual(300)
+        expect(response.status).toBeLessThan(400)
+        const location = new URL(response.headers.get('location') ?? '', 'https://example.com')
+        expect(location.pathname).toBe('/login')
+        expect(location.searchParams.has('error')).toBe(false)
     })
 
     it('passes through to the existing /login redirect when there is no session yet', async ({ expect }) => {
