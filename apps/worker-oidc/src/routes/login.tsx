@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { type FormEvent, useEffect, useState } from 'react'
 import { GoogleButton } from '../GoogleButton'
+import { buildAuthorizeResumeQuery } from '../lib/resume-authorize-query'
 
 export const Route = createFileRoute('/login')({
     component: LoginRoute
@@ -44,11 +45,10 @@ function LoginRoute() {
             setError('Sign-in failed, please try again.')
             return
         }
-        // Strip a stale ?error= (e.g. from a prior not_authorized bounce) before resuming —
-        // same reasoning GoogleButton.tsx applies to its own reused query.
-        const params = new URLSearchParams(oauthQuery)
-        params.delete('error')
-        window.location.href = `/api/auth/oauth2/authorize?${params.toString()}`
+        // Strips prompt=login/create (already satisfied by this sign-in — see
+        // resume-authorize-query.ts for why leaving it in would loop back to /login forever) and
+        // a stale ?error= (e.g. from a prior not_authorized bounce) before resuming.
+        window.location.href = `/api/auth/oauth2/authorize?${buildAuthorizeResumeQuery(oauthQuery)}`
     }
 
     return (
