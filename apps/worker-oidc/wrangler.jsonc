@@ -19,6 +19,7 @@
         "not_found_handling": "single-page-application",
         "run_worker_first": ["/api/auth/*", "/internal/*", "/api/admin/*", "/api/invites/*"]
     },
+    "send_email": [{ "name": "EMAIL" }],
     "observability": {
         "enabled": true
     },
