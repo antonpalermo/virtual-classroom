@@ -110,4 +110,89 @@ describe('rate limiting', () => {
             expect(sixth.status).toBe(429)
         })
     })
+
+    describe('POST /api/invites/accept rate limiting', () => {
+        function acceptInvite(headers: Record<string, string>, body: unknown) {
+            return callAsApp(
+                new Request('https://example.com/api/invites/accept', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json', ...headers },
+                    body: JSON.stringify(body)
+                })
+            )
+        }
+
+        it('blocks the 6th attempt from the same IP within the 60s window', async ({ expect }) => {
+            const ip = '203.0.113.50'
+            for (let i = 0; i < 5; i++) {
+                const response = await acceptInvite({ 'cf-connecting-ip': ip }, { token: 'not-a-real-token', password: 'irrelevant1234' })
+                expect(response.status).not.toBe(429)
+            }
+            const sixth = await acceptInvite({ 'cf-connecting-ip': ip }, { token: 'not-a-real-token', password: 'irrelevant1234' })
+            expect(sixth.status).toBe(429)
+        })
+
+        it('does not rate-limit a different IP', async ({ expect }) => {
+            const busyIp = '203.0.113.60'
+            const otherIp = '203.0.113.61'
+            for (let i = 0; i < 5; i++) {
+                await acceptInvite({ 'cf-connecting-ip': busyIp }, { token: 'not-a-real-token', password: 'irrelevant1234' })
+            }
+            const blocked = await acceptInvite({ 'cf-connecting-ip': busyIp }, { token: 'not-a-real-token', password: 'irrelevant1234' })
+            expect(blocked.status).toBe(429)
+
+            const stillAllowed = await acceptInvite(
+                { 'cf-connecting-ip': otherIp },
+                { token: 'not-a-real-token', password: 'irrelevant1234' }
+            )
+            expect(stillAllowed.status).not.toBe(429)
+        })
+
+        it('still rate-limits a request with no resolvable client IP', async ({ expect }) => {
+            // Deliberately don't set cf-connecting-ip, and route around callAsApp's auto-injection by
+            // setting it to an empty string, which Better Auth's own getIPFromHeader-equivalent
+            // parsing (and this middleware's own header read) treats as absent.
+            for (let i = 0; i < 5; i++) {
+                const response = await acceptInvite({ 'cf-connecting-ip': '' }, { token: 'not-a-real-token', password: 'irrelevant1234' })
+                expect(response.status).not.toBe(429)
+            }
+            const sixth = await acceptInvite({ 'cf-connecting-ip': '' }, { token: 'not-a-real-token', password: 'irrelevant1234' })
+            expect(sixth.status).toBe(429)
+        })
+
+        it('rate-limits before the route handler parses the body, even for a malformed body', async ({ expect }) => {
+            const ip = '203.0.113.70'
+            for (let i = 0; i < 5; i++) {
+                const response = await callAsApp(
+                    new Request('https://example.com/api/invites/accept', {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip },
+                        body: 'not valid json at all'
+                    })
+                )
+                expect(response.status).not.toBe(429)
+            }
+            const sixth = await callAsApp(
+                new Request('https://example.com/api/invites/accept', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip },
+                    body: 'not valid json at all'
+                })
+            )
+            expect(sixth.status).toBe(429)
+        })
+    })
+
+    describe('consumeRateLimit concurrency', () => {
+        it('allows exactly max concurrent requests to succeed, never more', async ({ expect }) => {
+            const { createDb } = await import('../worker/db/client.js')
+            const { consumeRateLimit } = await import('../worker/rate-limit.js')
+            const db = createDb(env.OIDC_DB)
+            const key = `concurrency-test|${crypto.randomUUID()}`
+
+            const results = await Promise.all(Array.from({ length: 8 }, () => consumeRateLimit(db, key, 10, 3)))
+
+            expect(results.filter(Boolean).length).toBe(3)
+        })
+    })
 })

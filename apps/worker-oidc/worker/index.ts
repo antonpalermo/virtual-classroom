@@ -5,6 +5,7 @@ import { registerAdminUsersRoutes } from './admin-users.js'
 import { createAuth } from './auth.js'
 import { registerBootstrapAdminUserRoute } from './bootstrap-admin-user.js'
 import { createDb } from './db/client.js'
+import { registerInviteAcceptRateLimit } from './rate-limit.js'
 import { registerBootstrapRoute } from './register-oauth-client.js'
 import { registerWorkerAdminAuthorizeGate } from './restrict-worker-admin-client.js'
 
@@ -13,6 +14,9 @@ const app = new Hono<{ Bindings: Env }>()
 registerBootstrapRoute(app)
 registerBootstrapAdminUserRoute(app)
 registerAdminUsersRoutes(app)
+// Must run before registerAcceptInviteRoute's own handler below so an over-limit request never
+// reaches it — same ordering discipline as registerWorkerAdminAuthorizeGate below.
+registerInviteAcceptRateLimit(app)
 registerAcceptInviteRoute(app)
 // Must run before the catch-all /api/auth/* handler below so it can intercept and redirect
 // instead of letting Better Auth's own authorize handler run.
