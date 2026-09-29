@@ -55,7 +55,12 @@ export function createAuth(db: Db, env: Env) {
                 // /change-password, /change-email (3/10s) and /request-password-reset,
                 // /forget-password* (3/60s) — but not this endpoint, the actual token-redemption
                 // step, which would otherwise fall back to the loose 100/10s global default.
-                '/reset-password': { window: 60, max: 5 }
+                '/reset-password': { window: 60, max: 5 },
+                // Public, read-only key set. Must stay unlimited: worker/admin-users.ts's
+                // requireAdmin fetches it in-process via a synthetic request with no
+                // cf-connecting-ip, which would otherwise share one "no-trusted-ip" 100/10s bucket
+                // across every admin API call (and 401 them once exhausted).
+                '/jwks': false
             }
         },
         // CF-Connecting-IP is the Workers-canonical trusted client IP, set by Cloudflare's edge

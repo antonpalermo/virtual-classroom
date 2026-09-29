@@ -90,6 +90,16 @@ describe('rate limiting', () => {
         })
     })
 
+    describe('/api/auth/jwks exemption', () => {
+        it('never rate-limits the JWKS endpoint (requireAdmin fetches it in-process)', async ({ expect }) => {
+            const ip = '203.0.113.90'
+            for (let i = 0; i < 101; i++) {
+                const response = await callAsApp(new Request('https://example.com/api/auth/jwks', { headers: { 'cf-connecting-ip': ip } }))
+                expect(response.status).toBe(200)
+            }
+        })
+    })
+
     describe('/api/auth/reset-password custom rule', () => {
         it('blocks the 6th reset-password attempt from the same IP within the 60s window', async ({ expect }) => {
             const ip = '203.0.113.40'
