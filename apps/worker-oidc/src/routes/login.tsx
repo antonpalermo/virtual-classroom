@@ -64,6 +64,9 @@ function LoginRoute() {
                 <button type="submit">Sign in</button>
             </form>
             {error && <p style={{ color: 'red' }}>{error}</p>}
+            <p>
+                <a href="/forgot-password">Forgot your password?</a>
+            </p>
             <GoogleButton oauthQuery={oauthQuery} />
         </div>
     )

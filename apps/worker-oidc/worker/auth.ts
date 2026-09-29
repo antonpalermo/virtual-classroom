@@ -4,6 +4,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError } from 'better-auth/api'
 import { jwt } from 'better-auth/plugins'
 import type { Db } from './db/client.js'
+import { sendPasswordResetEmail } from './send-password-reset-email.js'
 
 // role/banned/banExpires aren't in better-auth's base User type — they only ship with the
 // `admin` plugin's schema merge, which this worker deliberately doesn't enable (see
@@ -17,7 +18,18 @@ export function createAuth(db: Db, env: Env) {
         secret: env.BETTER_AUTH_SECRET,
         database: drizzleAdapter(db, { provider: 'sqlite' }),
         emailAndPassword: {
-            enabled: true
+            enabled: true,
+            // Self-service reset for an account that already has a credential (bootstrapped
+            // admin or invite-accepted — see worker/accept-invite.ts). Unlike /sign-up/email
+            // below, there's no "no self-service accounts" rule to enforce here: forget-password
+            // never creates a user, only lets an existing one regain access to one they already
+            // have. Better Auth owns the whole token lifecycle (creation, single-use, expiry,
+            // generic/timing-safe response) via its own `verification` table.
+            sendResetPassword: async ({ user, url }) => {
+                await sendPasswordResetEmail(env, user.email, url)
+            },
+            // Ends any session an attacker already opened with the compromised password.
+            revokeSessionsOnPasswordReset: true
         },
         // No self-service accounts: admins are seeded via worker/bootstrap-admin-user.ts
         // (invite links are the planned longer-term mechanism). disabledPaths only gates the
