@@ -42,7 +42,12 @@ function LoginRoute() {
             body: JSON.stringify({ email: form.get('email'), password: form.get('password') })
         })
         if (!response.ok) {
-            setError('Sign-in failed, please try again.')
+            // 429 = rate-limited (possibly a whole lab sharing one IP), not a wrong password.
+            setError(
+                response.status === 429
+                    ? 'Too many attempts from your network. Please wait a minute and try again.'
+                    : 'Sign-in failed, please try again.'
+            )
             return
         }
         // Strips prompt=login/create (already satisfied by this sign-in — see

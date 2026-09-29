@@ -25,7 +25,11 @@ function ResetPasswordRoute() {
             body: JSON.stringify({ newPassword: password, token })
         })
         if (!response.ok) {
-            setError('Could not reset your password, please try again.')
+            setError(
+                response.status === 429
+                    ? 'Too many attempts from your network. Please wait a minute and try again.'
+                    : 'Could not reset your password, please try again.'
+            )
             return
         }
         setDone(true)

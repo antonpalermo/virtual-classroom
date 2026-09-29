@@ -14,14 +14,21 @@ function ForgotPasswordRoute() {
         setError(null)
         const form = new FormData(event.currentTarget)
         try {
-            await fetch('/api/auth/request-password-reset', {
+            const response = await fetch('/api/auth/request-password-reset', {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
                 body: JSON.stringify({ email: form.get('email'), redirectTo: '/reset-password' })
             })
-            // Shown regardless of the response status/body — Better Auth deliberately responds
-            // the same way whether or not the email matches an account, so branching on the
-            // result here would defeat that anti-enumeration behavior.
+            // A 429 (rate-limited) is the one exception: it depends only on the caller's IP, not on
+            // the email, so surfacing it leaks nothing — and otherwise we'd claim an email was sent
+            // when it wasn't.
+            if (response.status === 429) {
+                setError('Too many attempts from your network. Please wait a minute and try again.')
+                return
+            }
+            // Shown regardless of any other response status/body — Better Auth deliberately
+            // responds the same way whether or not the email matches an account, so branching on
+            // the result here would defeat that anti-enumeration behavior.
             setDone(true)
         } catch {
             setError('Something went wrong, please try again.')
