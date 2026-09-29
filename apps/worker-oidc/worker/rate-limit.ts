@@ -1,3 +1,4 @@
+import { getIP } from '@better-auth/core/utils/ip'
 import { generateRandomString } from 'better-auth/crypto'
 import { and, eq, gt, lt, sql } from 'drizzle-orm'
 import type { Hono } from 'hono'
@@ -48,13 +49,16 @@ export async function consumeRateLimit(db: Db, key: string, windowSeconds: numbe
 
 // Same `${ip}|${path}` key format Better Auth's own limiter uses internally
 // (createRateLimitKey in @better-auth/core/utils/ip) — not read back by it, just kept visually
-// consistent since both mechanisms write into the same table. Falls back to the same
-// "no-trusted-ip" bucket Better Auth's own getIP falls back to when the header is absent or empty,
-// so a request with no resolvable client IP is still rate-limited rather than passing through
-// unlimited.
+// consistent since both mechanisms write into the same table. The IP is resolved with Better
+// Auth's own getIP (same ipAddressHeaders as worker/auth.ts), so it's normalized identically —
+// notably IPv6 collapsed to its /64, so a client can't mint a fresh bucket per request by rotating
+// the low bits it controls. Falls back to the same "no-trusted-ip" bucket Better Auth uses when no
+// IP resolves, so such a request is still rate-limited rather than passing through unlimited.
+const IP_OPTIONS = { advanced: { ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] } } }
+
 export function registerInviteAcceptRateLimit(app: Hono<{ Bindings: Env }>) {
     app.use('/api/invites/accept', async (c, next) => {
-        const ip = c.req.header('cf-connecting-ip') || 'no-trusted-ip'
+        const ip = getIP(c.req.raw, IP_OPTIONS) ?? 'no-trusted-ip'
         const db = createDb(c.env.OIDC_DB)
         const allowed = await consumeRateLimit(db, `${ip}|/api/invites/accept`, 60, 5)
         if (!allowed) {

@@ -170,6 +170,16 @@ describe('rate limiting', () => {
             expect(sixth.status).toBe(429)
         })
 
+        it('buckets IPv6 clients by /64, so rotating the low bits does not evade the limit', async ({ expect }) => {
+            const body = { token: 'not-a-real-token', password: 'irrelevant1234' }
+            for (let i = 1; i <= 5; i++) {
+                const response = await acceptInvite({ 'cf-connecting-ip': `2001:db8:0:42::${i}` }, body)
+                expect(response.status).not.toBe(429)
+            }
+            const sixth = await acceptInvite({ 'cf-connecting-ip': '2001:db8:0:42:ffff::6' }, body)
+            expect(sixth.status).toBe(429)
+        })
+
         it('rate-limits before the route handler parses the body, even for a malformed body', async ({ expect }) => {
             const ip = '203.0.113.70'
             for (let i = 0; i < 5; i++) {
