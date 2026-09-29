@@ -89,4 +89,25 @@ describe('rate limiting', () => {
             expect(stillAllowedReset.status).not.toBe(429)
         })
     })
+
+    describe('/api/auth/reset-password custom rule', () => {
+        it('blocks the 6th reset-password attempt from the same IP within the 60s window', async ({ expect }) => {
+            const ip = '203.0.113.40'
+            const attempt = () =>
+                callAsApp(
+                    new Request('https://example.com/api/auth/reset-password', {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip },
+                        body: JSON.stringify({ newPassword: 'irrelevant-not-used-1234', token: 'not-a-real-token' })
+                    })
+                )
+
+            for (let i = 0; i < 5; i++) {
+                const response = await attempt()
+                expect(response.status).not.toBe(429)
+            }
+            const sixth = await attempt()
+            expect(sixth.status).toBe(429)
+        })
+    })
 })
