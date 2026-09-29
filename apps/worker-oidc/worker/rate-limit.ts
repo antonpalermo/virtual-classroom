@@ -10,7 +10,7 @@ import { rateLimit } from './db/schema.js'
 // path this worker needs (no plugin hooks, no configurable backends). Needed only for
 // POST /api/invites/accept, which sits outside Better Auth's own /api/auth/* handler and so never
 // sees its built-in limiter.
-export async function consumeRateLimit(db: Db, key: string, windowSeconds: number, max: number): Promise<boolean> {
+export async function consumeRateLimit(db: Db, key: string, windowSeconds: number, max: number, retried = false): Promise<boolean> {
     const now = Date.now()
     const windowStart = now - windowSeconds * 1000
 
@@ -20,10 +20,14 @@ export async function consumeRateLimit(db: Db, key: string, windowSeconds: numbe
         try {
             await db.insert(rateLimit).values({ id: generateRandomString(32, 'a-z', 'A-Z', '0-9'), key, count: 1, lastRequest: now })
             return true
-        } catch {
-            // Lost a race against a concurrent first request for the same key — it exists now, so
-            // fall through and evaluate against its row instead of erroring this request.
-            return consumeRateLimit(db, key, windowSeconds, max)
+        } catch (error) {
+            // The common case is losing a race against a concurrent first request for the same
+            // key — it exists now, so retry once and evaluate against its row instead of erroring
+            // this request. Bounded to one retry: a genuine write error (schema mismatch, D1
+            // outage, or a lagging read replica that keeps missing the row) must not recurse
+            // forever and exhaust the Worker's CPU/wall-clock limit.
+            if (retried) throw error
+            return consumeRateLimit(db, key, windowSeconds, max, true)
         }
     }
 
