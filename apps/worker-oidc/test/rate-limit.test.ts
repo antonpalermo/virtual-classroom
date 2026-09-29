@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers'
 import { eq } from 'drizzle-orm'
-import { describe, it } from 'vitest'
+import { describe, it, vi } from 'vitest'
 import { createDb } from '../worker/db/client.js'
 import { rateLimit } from '../worker/db/schema.js'
 import { callAsApp } from './helpers/call-app.js'
@@ -180,6 +180,21 @@ describe('rate limiting', () => {
             expect(sixth.status).toBe(429)
         })
 
+        it('allows attempts again once the 60s window has elapsed', async ({ expect }) => {
+            const ip = '203.0.113.80'
+            const body = { token: 'not-a-real-token', password: 'irrelevant1234' }
+            for (let i = 0; i < 5; i++) await acceptInvite({ 'cf-connecting-ip': ip }, body)
+            expect((await acceptInvite({ 'cf-connecting-ip': ip }, body)).status).toBe(429)
+
+            const db = createDb(env.OIDC_DB)
+            await db
+                .update(rateLimit)
+                .set({ lastRequest: Date.now() - 61_000 })
+                .where(eq(rateLimit.key, `${ip}|/api/invites/accept`))
+
+            expect((await acceptInvite({ 'cf-connecting-ip': ip }, body)).status).not.toBe(429)
+        })
+
         it('rate-limits before the route handler parses the body, even for a malformed body', async ({ expect }) => {
             const ip = '203.0.113.70'
             for (let i = 0; i < 5; i++) {
@@ -213,6 +228,21 @@ describe('rate limiting', () => {
             const results = await Promise.all(Array.from({ length: 8 }, () => consumeRateLimit(db, key, 10, 3)))
 
             expect(results.filter(Boolean).length).toBe(3)
+        })
+
+        it('resets a full bucket when exactly one window has elapsed', async ({ expect }) => {
+            const { consumeRateLimit } = await import('../worker/rate-limit.js')
+            const db = createDb(env.OIDC_DB)
+            const key = `boundary-test|${crypto.randomUUID()}`
+            const now = Date.now()
+            await db.insert(rateLimit).values({ id: crypto.randomUUID(), key, count: 3, lastRequest: now - 10_000 })
+
+            const spy = vi.spyOn(Date, 'now').mockReturnValue(now)
+            try {
+                expect(await consumeRateLimit(db, key, 10, 3)).toBe(true)
+            } finally {
+                spy.mockRestore()
+            }
         })
     })
 })

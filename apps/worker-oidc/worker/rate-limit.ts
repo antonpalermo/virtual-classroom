@@ -1,6 +1,6 @@
 import { getIP } from '@better-auth/core/utils/ip'
 import { generateRandomString } from 'better-auth/crypto'
-import { and, eq, gt, lt, sql } from 'drizzle-orm'
+import { and, eq, gt, lt, lte, sql } from 'drizzle-orm'
 import type { Hono } from 'hono'
 import { createDb, type Db } from './db/client.js'
 import { rateLimit } from './db/schema.js'
@@ -13,7 +13,7 @@ import { rateLimit } from './db/schema.js'
 // sees its built-in limiter.
 export async function consumeRateLimit(db: Db, key: string, windowSeconds: number, max: number, retried = false): Promise<boolean> {
     const now = Date.now()
-    const windowStart = now - windowSeconds * 1000
+    const windowInMs = windowSeconds * 1000
 
     const [existing] = await db.select().from(rateLimit).where(eq(rateLimit.key, key)).limit(1)
 
@@ -32,18 +32,28 @@ export async function consumeRateLimit(db: Db, key: string, windowSeconds: numbe
         }
     }
 
-    if (existing.lastRequest < windowStart) {
+    // Same `>=` as Better Auth's decideConsume/consume, so a request landing exactly on the window
+    // boundary resets rather than falling through to the increment branch's strict `gt` and being
+    // spuriously denied.
+    if (now - existing.lastRequest >= windowInMs) {
+        // Compare-and-swap against the exact lastRequest this request read (Better Auth's own
+        // `lte(lastRequest, data.lastRequest)`): of several concurrent resetters only one wins.
         const result = await db
             .update(rateLimit)
             .set({ count: 1, lastRequest: now })
-            .where(and(eq(rateLimit.key, key), lt(rateLimit.lastRequest, windowStart)))
-        return result.meta.changes > 0
+            .where(and(eq(rateLimit.key, key), lte(rateLimit.lastRequest, existing.lastRequest)))
+        if (result.meta.changes > 0) return true
+        // Lost the race: re-evaluate against the winner's freshly-reset row via the normal
+        // increment path rather than denying outright. Same one-retry bound as above; a second
+        // lost race denies (over-denial, never over-admission).
+        if (retried) return false
+        return consumeRateLimit(db, key, windowSeconds, max, true)
     }
 
     const result = await db
         .update(rateLimit)
         .set({ count: sql`${rateLimit.count} + 1`, lastRequest: now })
-        .where(and(eq(rateLimit.key, key), gt(rateLimit.lastRequest, windowStart), lt(rateLimit.count, max)))
+        .where(and(eq(rateLimit.key, key), gt(rateLimit.lastRequest, now - windowInMs), lt(rateLimit.count, max)))
     return result.meta.changes > 0
 }
 
@@ -60,6 +70,8 @@ export function registerInviteAcceptRateLimit(app: Hono<{ Bindings: Env }>) {
     app.use('/api/invites/accept', async (c, next) => {
         const ip = getIP(c.req.raw, IP_OPTIONS) ?? 'no-trusted-ip'
         const db = createDb(c.env.OIDC_DB)
+        // Window must stay <= Better Auth's longest configured window (currently 60s): its database
+        // storage prunes every rate_limit row older than that, including these, mid-window.
         const allowed = await consumeRateLimit(db, `${ip}|/api/invites/accept`, 60, 5)
         if (!allowed) {
             return c.json({ message: 'Too many requests. Please try again later.' }, 429, { 'X-Retry-After': '60' })
