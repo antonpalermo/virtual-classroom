@@ -57,10 +57,15 @@ describe('rate limiting', () => {
         })
 
         it('allows requests again once the window has elapsed', async ({ expect }) => {
-            await requestPasswordReset(FIXED_IP, 'rl-reset-2@example.com')
-            await requestPasswordReset(FIXED_IP, 'rl-reset-2@example.com')
-            await requestPasswordReset(FIXED_IP, 'rl-reset-2@example.com')
-            const blocked = await requestPasswordReset(FIXED_IP, 'rl-reset-2@example.com')
+            // Own IP, not FIXED_IP: the previous test already exhausted FIXED_IP's
+            // /request-password-reset bucket (D1 state persists across it() blocks in this file),
+            // which would make every assertion below pass without this test's own calls mattering.
+            const ip = '203.0.113.20'
+            for (let i = 0; i < 3; i++) {
+                const response = await requestPasswordReset(ip, 'rl-reset-2@example.com')
+                expect(response.status).not.toBe(429)
+            }
+            const blocked = await requestPasswordReset(ip, 'rl-reset-2@example.com')
             expect(blocked.status).toBe(429)
 
             // Simulate the 60s window elapsing by back-dating this key's row directly, same
@@ -69,9 +74,9 @@ describe('rate limiting', () => {
             await db
                 .update(rateLimit)
                 .set({ lastRequest: Date.now() - 61_000 })
-                .where(eq(rateLimit.key, `${FIXED_IP}|/request-password-reset`))
+                .where(eq(rateLimit.key, `${ip}|/request-password-reset`))
 
-            const afterWindow = await requestPasswordReset(FIXED_IP, 'rl-reset-2@example.com')
+            const afterWindow = await requestPasswordReset(ip, 'rl-reset-2@example.com')
             expect(afterWindow.status).not.toBe(429)
         })
 
