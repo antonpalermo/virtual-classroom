@@ -299,6 +299,22 @@ export const invite = sqliteTable(
     table => [index('invite_userId_idx').on(table.userId)]
 )
 
+// Backs both worker/auth.ts's rateLimit: { storage: 'database' } config (everything under
+// /api/auth/*) and worker/rate-limit.ts's hand-rolled middleware for /api/invites/accept, which
+// sits outside Better Auth's own handler. Shape confirmed by actually running
+// `npx auth@1.7.1 generate` with rateLimit.storage: 'database' set — hand-added here rather than
+// via a full regen, since a full regen currently wipes every other hand-added field in this file
+// (the user role/banned/banReason/banExpires columns, the whole invite table) and reformats
+// everything, which the existing "expected to produce no diff" comment above the invite table
+// doesn't yet reflect. `lastRequest` is a plain epoch-ms number, not `timestamp_ms` mode — Better
+// Auth's own rate-limiter code treats it as a raw number, not a Date.
+export const rateLimit = sqliteTable('rate_limit', {
+    id: text('id').primaryKey(),
+    key: text('key').notNull().unique(),
+    count: integer('count').notNull(),
+    lastRequest: integer('last_request').notNull()
+})
+
 export const userRelations = relations(user, ({ many }) => ({
     sessions: many(session),
     accounts: many(account),
