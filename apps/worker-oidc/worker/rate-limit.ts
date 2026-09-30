@@ -23,11 +23,14 @@ export async function consumeRateLimit(db: Db, key: string, windowSeconds: numbe
             return true
         } catch (error) {
             // The common case is losing a race against a concurrent first request for the same
-            // key — it exists now, so retry once and evaluate against its row instead of erroring
-            // this request. Bounded to one retry: a genuine write error (schema mismatch, D1
-            // outage, or a lagging read replica that keeps missing the row) must not recurse
-            // forever and exhaust the Worker's CPU/wall-clock limit.
+            // key — confirm the row actually exists now before treating this as that race (mirrors
+            // Better Auth's own consume(): a genuine write error, e.g. a D1 outage, leaves no row
+            // behind and should rethrow immediately rather than waste a retry). Bounded to one
+            // retry either way: it must not recurse forever and exhaust the Worker's CPU/wall-clock
+            // limit.
             if (retried) throw error
+            const [afterRace] = await db.select().from(rateLimit).where(eq(rateLimit.key, key)).limit(1)
+            if (!afterRace) throw error
             return consumeRateLimit(db, key, windowSeconds, max, true)
         }
     }
@@ -66,15 +69,25 @@ export async function consumeRateLimit(db: Db, key: string, windowSeconds: numbe
 // IP resolves, so such a request is still rate-limited rather than passing through unlimited.
 const IP_OPTIONS = { advanced: { ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] } } }
 
+// Window must stay <= Better Auth's longest configured window (currently 60s): its database
+// storage prunes every rate_limit row older than that, including these, mid-window. Shared between
+// the consumeRateLimit call and the 429's X-Retry-After so the two can't drift apart.
+const WINDOW_SECONDS = 60
+const MAX_ATTEMPTS = 5
+
 export function registerInviteAcceptRateLimit(app: Hono<{ Bindings: Env }>) {
     app.use('/api/invites/accept', async (c, next) => {
+        // registerAcceptInviteRoute below only registers POST for this path — app.use() matches
+        // every HTTP method, so without this check a GET/PUT/DELETE (which would just 404 past
+        // this point) still consumed a slot in the same IP+path bucket, letting a caller burn
+        // through a victim's 5-request budget with cheap non-POST requests and lock out their real
+        // POST attempt for the rest of the window.
+        if (c.req.method !== 'POST') return next()
         const ip = getIP(c.req.raw, IP_OPTIONS) ?? 'no-trusted-ip'
         const db = createDb(c.env.OIDC_DB)
-        // Window must stay <= Better Auth's longest configured window (currently 60s): its database
-        // storage prunes every rate_limit row older than that, including these, mid-window.
-        const allowed = await consumeRateLimit(db, `${ip}|/api/invites/accept`, 60, 5)
+        const allowed = await consumeRateLimit(db, `${ip}|/api/invites/accept`, WINDOW_SECONDS, MAX_ATTEMPTS)
         if (!allowed) {
-            return c.json({ message: 'Too many requests. Please try again later.' }, 429, { 'X-Retry-After': '60' })
+            return c.json({ message: 'Too many requests. Please try again later.' }, 429, { 'X-Retry-After': String(WINDOW_SECONDS) })
         }
         return next()
     })

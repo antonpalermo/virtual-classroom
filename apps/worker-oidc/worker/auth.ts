@@ -55,7 +55,15 @@ export function createAuth(db: Db, env: Env) {
                 // /change-password, /change-email (3/10s) and /request-password-reset,
                 // /forget-password* (3/60s) — but not this endpoint, the actual token-redemption
                 // step, which would otherwise fall back to the loose 100/10s global default.
+                // Two entries, not one: POST /reset-password (the actual redemption) is matched by
+                // the exact '/reset-password' key, but Better Auth also serves
+                // GET /reset-password/:token (requestPasswordResetCallback) as a *separate* path —
+                // it validates the token and redirects differently for a valid vs. invalid one, so
+                // it's just as much a token-guessing oracle. Without this second, wildcarded key it
+                // silently falls back to the loose 100/10s global default, undermining the whole
+                // point of tightening this endpoint.
                 '/reset-password': { window: 60, max: 5 },
+                '/reset-password/*': { window: 60, max: 5 },
                 // Public, read-only key set. Must stay unlimited: worker/admin-users.ts's
                 // requireAdmin fetches it in-process via a synthetic request with no
                 // cf-connecting-ip, which would otherwise share one "no-trusted-ip" 100/10s bucket
