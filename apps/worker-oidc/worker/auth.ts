@@ -40,6 +40,44 @@ export function createAuth(db: Db, env: Env) {
         // would block that internal call too, since it's checked inside the endpoint handler
         // itself rather than at the router.
         disabledPaths: ['/sign-up/email'],
+        // Better Auth's own default (enabled: isProduction) never actually turns on in this
+        // deployment — Cloudflare Workers doesn't set NODE_ENV, so isProduction is always false
+        // here (confirmed by reading @better-auth/core's env-impl.mjs directly). Enable it
+        // explicitly instead. storage: 'database' reuses OIDC_DB via the same Drizzle adapter
+        // already used everywhere else in this worker — no new binding. See
+        // worker/db/schema.ts's `rateLimit` table and worker/rate-limit.ts (the one endpoint,
+        // /api/invites/accept, outside this handler that also needs rate limiting).
+        rateLimit: {
+            enabled: true,
+            storage: 'database',
+            customRules: {
+                // Better Auth's own default special rules cover /sign-in*, /sign-up*,
+                // /change-password, /change-email (3/10s) and /request-password-reset,
+                // /forget-password* (3/60s) — but not this endpoint, the actual token-redemption
+                // step, which would otherwise fall back to the loose 100/10s global default.
+                // Two entries, not one: POST /reset-password (the actual redemption) is matched by
+                // the exact '/reset-password' key, but Better Auth also serves
+                // GET /reset-password/:token (requestPasswordResetCallback) as a *separate* path —
+                // it validates the token and redirects differently for a valid vs. invalid one, so
+                // it's just as much a token-guessing oracle. Without this second, wildcarded key it
+                // silently falls back to the loose 100/10s global default, undermining the whole
+                // point of tightening this endpoint.
+                '/reset-password': { window: 60, max: 5 },
+                '/reset-password/*': { window: 60, max: 5 },
+                // Public, read-only key set. Must stay unlimited: worker/admin-users.ts's
+                // requireAdmin fetches it in-process via a synthetic request with no
+                // cf-connecting-ip, which would otherwise share one "no-trusted-ip" 100/10s bucket
+                // across every admin API call (and 401 them once exhausted).
+                '/jwks': false
+            }
+        },
+        // CF-Connecting-IP is the Workers-canonical trusted client IP, set by Cloudflare's edge
+        // and unspoofable by the client. Better Auth's own default header is x-forwarded-for.
+        advanced: {
+            ipAddress: {
+                ipAddressHeaders: ['cf-connecting-ip']
+            }
+        },
         socialProviders: {
             google: {
                 clientId: env.GOOGLE_CLIENT_ID,
