@@ -10,7 +10,11 @@ export default defineConfig(async () => {
             cloudflareTest({
                 wrangler: { configPath: './wrangler.jsonc' },
                 miniflare: {
-                    bindings: { TEST_MIGRATIONS: migrations }
+                    bindings: {
+                        TEST_MIGRATIONS: migrations,
+                        EMAIL_PROVIDER_ENDPOINT: 'https://email-provider.test.invalid',
+                        EMAIL_PROVIDER_SECRET_KEY: 'test-secret-key'
+                    }
                 }
             })
         ],
