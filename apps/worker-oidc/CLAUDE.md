@@ -37,7 +37,6 @@ This worker follows `apps/worker-client`'s split: a real backend Cloudflare Work
         -H "Content-Type: application/json" \
         -d '{"email":"<admin email>","password":"<admin password>","name":"Admin"}'
     ```
-
 - `worker/send-password-reset-email.ts` — `sendPasswordResetEmail(env, to, url)`, sends an HTML email with the reset `url` Better Auth generated through our custom email platform: a single `POST ${EMAIL_PROVIDER_ENDPOINT}/v1/send` with `Authorization: Bearer ${EMAIL_PROVIDER_SECRET_KEY}` and a JSON body of `{ to, from, subject, body }` (no Cloudflare binding). `from` reads `env.RESET_EMAIL_FROM`. Throws on a non-2xx response so a failed send is logged rather than silently dropped — see "Password reset" below.
 - `worker/rate-limit.ts` — `consumeRateLimit(db, key, windowSeconds, max)`, a trimmed reimplementation of Better Auth's own database-backed rate-limiter logic against the same `rate_limit` table `worker/auth.ts`'s `rateLimit: { storage: 'database' }` config creates, and `registerInviteAcceptRateLimit(app)`, which applies it to `POST /api/invites/accept` — the one anonymous, token-guessable endpoint that sits outside Better Auth's own `/api/auth/*` handler and so never sees its built-in limiter. See "Rate limiting" below.
 - `worker/db/client.ts` — `createDb(d1)`, wraps the `OIDC_DB` binding in a Drizzle client.
