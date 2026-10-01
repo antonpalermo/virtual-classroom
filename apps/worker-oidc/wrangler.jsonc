@@ -11,7 +11,7 @@
         {
             "binding": "OIDC_DB",
             "database_name": "worker-oidc",
-            "database_id": "00000000-0000-0000-0000-000000000000",
+            "database_id": "f7d6f8e6-474b-4e5c-81a2-fe5619dfac90",
             "migrations_dir": "drizzle"
         }
     ],
@@ -23,5 +23,6 @@
     "observability": {
         "enabled": true
     },
-    "upload_source_maps": true
+    "upload_source_maps": true,
+    "routes": [{ "pattern": "auth.klassroom.online", "custom_domain": true }]
 }
