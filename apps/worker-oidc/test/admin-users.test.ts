@@ -70,6 +70,28 @@ describe('admin user-management API', () => {
         expect(row?.usedAt).toBeNull()
     })
 
+    it('creates a user with the requested role', async ({ expect }) => {
+        const token = await adminToken('role-creator-admin@example.com')
+        const response = await call('/api/admin/users', token, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: 'New Admin', email: 'new-admin@example.com', role: 'admin' })
+        })
+        expect(response.status).toBe(200)
+        const { user: createdUser } = await response.json<{ user: { role: string } }>()
+        expect(createdUser.role).toBe('admin')
+    })
+
+    it('rejects creating a user with an unknown role', async ({ expect }) => {
+        const token = await adminToken('bad-role-creator-admin@example.com')
+        const response = await call('/api/admin/users', token, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: 'Bad', email: 'bad-role-invitee@example.com', role: 'superuser' })
+        })
+        expect(response.status).toBe(400)
+    })
+
     it('rejects creating a user with an email that already exists', async ({ expect }) => {
         const token = await adminToken('dup-admin@example.com')
         const response = await call('/api/admin/users', token, {

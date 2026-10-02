@@ -80,10 +80,11 @@ export function registerAdminUsersRoutes(app: Hono<{ Bindings: Env }>) {
         const gate = await requireAdmin(c)
         if ('error' in gate) return c.text('', gate.error)
 
-        const body = await c.req.json<{ name?: string; email?: string }>().catch(() => null)
+        const body = await c.req.json<{ name?: string; email?: string; role?: string }>().catch(() => null)
         if (typeof body?.name !== 'string' || !body.name || typeof body.email !== 'string' || !body.email) {
             return c.text('Missing name or email', 400)
         }
+        if (body.role !== undefined && !ROLES.includes(body.role as Role)) return c.text('Invalid role', 400)
 
         const [existing] = await gate.db.select().from(user).where(eq(user.email, body.email)).limit(1)
         if (existing) return c.text('A user with that email already exists', 409)
@@ -96,7 +97,7 @@ export function registerAdminUsersRoutes(app: Hono<{ Bindings: Env }>) {
             // redeeming the invite link (see worker/accept-invite.ts), so the account is
             // intentionally not sign-in-able until then.
             createdUser = await authContext.internalAdapter.createUser(
-                { name: body.name, email: body.email, role: 'user' },
+                { name: body.name, email: body.email, role: body.role ?? 'user' },
                 { method: 'admin' }
             )
         } catch (error) {
