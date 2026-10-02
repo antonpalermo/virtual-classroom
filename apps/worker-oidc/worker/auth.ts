@@ -4,7 +4,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError } from 'better-auth/api'
 import { jwt } from 'better-auth/plugins'
 import type { Db } from './db/client.js'
-import { sendPasswordResetEmail } from './send-password-reset-email.js'
+import { sendPasswordResetEmail } from './send-email.js'
 
 // role/banned/banExpires aren't in better-auth's base User type — they only ship with the
 // `admin` plugin's schema merge, which this worker deliberately doesn't enable (see

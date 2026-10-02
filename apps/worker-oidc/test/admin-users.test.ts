@@ -1,10 +1,33 @@
 import { env } from 'cloudflare:workers'
 import { eq } from 'drizzle-orm'
-import { describe, it } from 'vitest'
+import { afterEach, beforeEach, describe, it, vi } from 'vitest'
 import { createDb } from '../worker/db/client.js'
 import { invite, user } from '../worker/db/schema.js'
 import { callAsApp } from './helpers/call-app.js'
 import { seedUser, signInForTokens } from './helpers/sign-in.js'
+
+const EMAIL_PROVIDER_ENDPOINT = 'https://email-provider.test.example.com'
+const emailEnv = { RESET_EMAIL_FROM: 'invites@test.example.com', EMAIL_PROVIDER_ENDPOINT, EMAIL_PROVIDER_SECRET_KEY: 'test-secret-key' }
+
+// Same stub as password-reset.test.ts: nothing else in these flows calls fetch, so every recorded
+// call is an invite send attempt.
+function mockEmailProvider(status = 200) {
+    return vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ success: status < 300 }, { status }))
+}
+
+function lastSentEmail(fetchSpy: ReturnType<typeof mockEmailProvider>) {
+    const [input, init] = fetchSpy.mock.calls.at(-1) ?? []
+    return { url: String(input), body: JSON.parse(String(init?.body)) as { to: string; body: string } }
+}
+
+async function createInvitee(token: string, email: string) {
+    const response = await call('/api/admin/users', token, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'Invitee', email })
+    })
+    return response.json<{ user: { id: string }; inviteUrl: string; emailSent: boolean }>()
+}
 
 async function adminToken(email = 'admin@example.com') {
     await seedUser(email, 'correct-horse-battery', { role: 'admin' })
@@ -17,11 +40,102 @@ function call(path: string, token?: string, init: RequestInit = {}) {
         new Request(`https://example.com${path}`, {
             ...init,
             headers: { ...(init.headers ?? {}), ...(token ? { authorization: `Bearer ${token}` } : {}) }
-        })
+        }),
+        emailEnv
     )
 }
 
 describe('admin user-management API', () => {
+    beforeEach(() => {
+        mockEmailProvider()
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('emails the invite link to the new user', async ({ expect }) => {
+        const token = await adminToken('emailing-admin@example.com')
+        const fetchSpy = mockEmailProvider()
+        const { inviteUrl, emailSent } = await createInvitee(token, 'emailed-invitee@example.com')
+
+        expect(emailSent).toBe(true)
+        expect(fetchSpy).toHaveBeenCalledTimes(1)
+        const sent = lastSentEmail(fetchSpy)
+        expect(sent.url).toBe(`${EMAIL_PROVIDER_ENDPOINT}/v1/send`)
+        expect(sent.body.to).toBe('emailed-invitee@example.com')
+        expect(sent.body.body).toContain(inviteUrl)
+    })
+
+    it('still creates the user and returns the invite link when the email fails', async ({ expect }) => {
+        const token = await adminToken('failed-email-admin@example.com')
+        mockEmailProvider(500)
+        const { user: createdUser, inviteUrl, emailSent } = await createInvitee(token, 'unemailed-invitee@example.com')
+
+        expect(emailSent).toBe(false)
+        expect(inviteUrl).toContain('/accept-invite?token=')
+        const db = createDb(env.OIDC_DB)
+        const [row] = await db.select().from(user).where(eq(user.id, createdUser.id)).limit(1)
+        expect(row).toBeDefined()
+    })
+
+    it('resends an invite with a fresh link and invalidates the old one', async ({ expect }) => {
+        const token = await adminToken('resend-admin@example.com')
+        const { user: createdUser, inviteUrl: oldUrl } = await createInvitee(token, 'resend-invitee@example.com')
+        const fetchSpy = mockEmailProvider()
+
+        const response = await call(`/api/admin/users/${createdUser.id}/invite`, token, { method: 'POST' })
+        expect(response.status).toBe(200)
+        const { inviteUrl: newUrl, emailSent } = await response.json<{ inviteUrl: string; emailSent: boolean }>()
+        expect(emailSent).toBe(true)
+        expect(newUrl).not.toBe(oldUrl)
+        expect(lastSentEmail(fetchSpy).body.body).toContain(newUrl)
+
+        const db = createDb(env.OIDC_DB)
+        const invites = await db.select().from(invite).where(eq(invite.userId, createdUser.id))
+        expect(invites.map(row => row.token)).toEqual([new URL(newUrl).searchParams.get('token')])
+    })
+
+    it('rate-limits resending to once per minute per invitee', async ({ expect }) => {
+        const token = await adminToken('resend-limit-admin@example.com')
+        const { user: first } = await createInvitee(token, 'resend-limit-1@example.com')
+        const { user: second } = await createInvitee(token, 'resend-limit-2@example.com')
+
+        const resend = (id: string) => call(`/api/admin/users/${id}/invite`, token, { method: 'POST' })
+        expect((await resend(first.id)).status).toBe(200)
+        const limited = await resend(first.id)
+        expect(limited.status).toBe(429)
+        expect(limited.headers.get('x-retry-after')).toBe('60')
+        // A different invitee has their own bucket.
+        expect((await resend(second.id)).status).toBe(200)
+    })
+
+    it('lists a not-yet-accepted invitee as pending and refuses to resend once they have an account', async ({ expect }) => {
+        const token = await adminToken('pending-admin@example.com')
+        const { user: createdUser, inviteUrl } = await createInvitee(token, 'pending-invitee@example.com')
+
+        const listed = await call('/api/admin/users', token).then(r =>
+            r.json<{ users: Array<{ id: string; email: string; pending: boolean }> }>()
+        )
+        expect(listed.users.find(u => u.id === createdUser.id)?.pending).toBe(true)
+        expect(listed.users.find(u => u.email === 'pending-admin@example.com')?.pending).toBe(false)
+
+        const accepted = await call('/api/invites/accept', undefined, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ token: new URL(inviteUrl).searchParams.get('token'), password: 'correct-horse-battery' })
+        })
+        expect(accepted.status).toBe(200)
+        const response = await call(`/api/admin/users/${createdUser.id}/invite`, token, { method: 'POST' })
+        expect(response.status).toBe(400)
+    })
+
+    it('404s a resend for an unknown user', async ({ expect }) => {
+        const token = await adminToken('resend-404-admin@example.com')
+        const response = await call('/api/admin/users/no-such-user/invite', token, { method: 'POST' })
+        expect(response.status).toBe(404)
+    })
+
     it('rejects every route with no Authorization header', async ({ expect }) => {
         const response = await call('/api/admin/users')
         expect(response.status).toBe(401)

@@ -1,17 +1,23 @@
 import { createLocalAccountIssuer } from '@better-auth/core/db'
 import { verifyAccessTokenWithJwks } from '@capstone/auth-verify'
 import { generateRandomString } from 'better-auth/crypto'
-import { and, eq, ne } from 'drizzle-orm'
+import { and, eq, isNull, ne, sql } from 'drizzle-orm'
 import type { Context, Hono } from 'hono'
 import { cors } from 'hono/cors'
 import type { JSONWebKeySet } from 'jose'
 import { createAuth } from './auth.js'
 import { createDb, type Db } from './db/client.js'
-import { invite, user } from './db/schema.js'
+import { account, invite, user } from './db/schema.js'
+import { consumeRateLimit } from './rate-limit.js'
+import { sendInviteEmail } from './send-email.js'
 
 const ROLES = ['user', 'admin'] as const
 type Role = (typeof ROLES)[number]
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+// Keyed per invitee, not per IP: the caller is already a trusted admin, the thing to protect is
+// the invitee's inbox. Same <= 60s window ceiling as worker/rate-limit.ts's (Better Auth prunes
+// older rate_limit rows mid-window).
+const RESEND_WINDOW_SECONDS = 60
 
 // Same cause-chain walk as register-oauth-client.ts's isDuplicateNameError, for the same reason:
 // drizzle-orm wraps the underlying D1 error, and the actual SQLite message
@@ -54,6 +60,21 @@ async function requireAdmin(c: Context<{ Bindings: Env }>) {
     return { db, caller: row }
 }
 
+// Email failure is reported, not thrown: the user/invite rows are already written, and the admin
+// can still hand the returned inviteUrl over out of band (emailSent: false tells the UI to show it).
+async function issueInvite(db: Db, env: Env, userId: string, email: string) {
+    const token = generateRandomString(32, 'a-z', 'A-Z', '0-9')
+    await db.insert(invite).values({ token, userId, expiresAt: new Date(Date.now() + INVITE_TTL_MS) })
+    const inviteUrl = `${env.BETTER_AUTH_URL}/accept-invite?token=${token}`
+    try {
+        await sendInviteEmail(env, email, inviteUrl)
+        return { inviteUrl, emailSent: true }
+    } catch (error) {
+        console.error('Invite email send failed', error)
+        return { inviteUrl, emailSent: false }
+    }
+}
+
 export function registerAdminUsersRoutes(app: Hono<{ Bindings: Env }>) {
     app.use('/api/admin/*', cors())
 
@@ -70,7 +91,12 @@ export function registerAdminUsersRoutes(app: Hono<{ Bindings: Env }>) {
                 banned: user.banned,
                 banReason: user.banReason,
                 banExpires: user.banExpires,
-                createdAt: user.createdAt
+                createdAt: user.createdAt,
+                // Accepting an invite is the only way an admin-created user gets an account row
+                // (see worker/accept-invite.ts), so "no account yet" means "invite still pending".
+                // Raw, fully-qualified SQL: drizzle renders interpolated columns unqualified here, so
+                // `id` would resolve to account.id inside the subquery.
+                pending: sql<boolean>`not exists (select 1 from "account" where "account"."user_id" = "user"."id")`.mapWith(Boolean)
             })
             .from(user)
         return c.json({ users: rows })
@@ -108,13 +134,30 @@ export function registerAdminUsersRoutes(app: Hono<{ Bindings: Env }>) {
             return c.text('A user with that email already exists', 409)
         }
 
-        const token = generateRandomString(32, 'a-z', 'A-Z', '0-9')
-        await gate.db.insert(invite).values({ token, userId: createdUser.id, expiresAt: new Date(Date.now() + INVITE_TTL_MS) })
-
         return c.json({
             user: { id: createdUser.id, name: createdUser.name, email: createdUser.email, role: createdUser.role },
-            inviteUrl: `${c.env.BETTER_AUTH_URL}/accept-invite?token=${token}`
+            ...(await issueInvite(gate.db, c.env, createdUser.id, createdUser.email))
         })
+    })
+
+    app.post('/api/admin/users/:id/invite', async c => {
+        const gate = await requireAdmin(c)
+        if ('error' in gate) return c.text('', gate.error)
+
+        const id = c.req.param('id')
+        const [target] = await gate.db.select().from(user).where(eq(user.id, id)).limit(1)
+        if (!target) return c.text('User not found', 404)
+        const [existingAccount] = await gate.db.select().from(account).where(eq(account.userId, id)).limit(1)
+        if (existingAccount) return c.text('This user has already accepted their invite', 400)
+        if (!(await consumeRateLimit(gate.db, `${id}|/api/admin/users/:id/invite`, RESEND_WINDOW_SECONDS, 1))) {
+            return c.text('An invite was just sent to this user. Wait a minute before resending.', 429, {
+                'X-Retry-After': String(RESEND_WINDOW_SECONDS)
+            })
+        }
+
+        // Only the newest link should work — e.g. the old one went to a mistyped address.
+        await gate.db.delete(invite).where(and(eq(invite.userId, id), isNull(invite.usedAt)))
+        return c.json(await issueInvite(gate.db, c.env, id, target.email))
     })
 
     app.patch('/api/admin/users/:id', async c => {
