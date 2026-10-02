@@ -1,5 +1,13 @@
 # @capstone/openid-connect
 
+## 0.3.0
+
+### Minor Changes
+
+- ed51590: Let admins pick a role (`user` or `admin`) when creating a user
+- 168c8b9: Adds self-service password reset: `/forgot-password` requests a reset (`POST /api/auth/request-password-reset`), Better Auth emails a one-time link via our custom email platform (`worker/send-password-reset-email.ts`, configured by `EMAIL_PROVIDER_ENDPOINT`/`EMAIL_PROVIDER_SECRET_KEY`), and `/reset-password` sets the new password (`POST /api/auth/reset-password`). Reuses Better Auth's own built-in reset-password endpoints and `verification` table rather than a hand-rolled token flow, and revokes any existing sessions on a successful reset. Requires a sending domain verified with the email platform, `RESET_EMAIL_FROM` set to an address on it, and `EMAIL_PROVIDER_SECRET_KEY` set via `wrangler secret put` — until then the request still succeeds generically, but no email is actually sent.
+- b3165fc: Enable real, atomic, D1-backed rate limiting on the credential/token-guessing surface (sign-in, password-reset request and redemption, invite-token redemption). Better Auth's built-in limiter had never actually been on in this deployment: it only defaults to enabled when `NODE_ENV === 'production'`, which Cloudflare Workers never sets. Storage is `'database'`, reusing the existing `OIDC_DB` D1 binding rather than adding a new Cloudflare binding.
+
 ## 0.2.0
 
 ### Minor Changes
