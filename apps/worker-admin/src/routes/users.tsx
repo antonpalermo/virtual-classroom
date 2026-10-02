@@ -95,7 +95,10 @@ function UserManagement({ jwt }: { jwt: string }) {
     async function handleCreate(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
         setLoadError(null)
-        const form = new FormData(event.currentTarget)
+        // Captured before the first await: React nulls event.currentTarget once the handler yields,
+        // so reading it after the fetch threw and skipped the loadUsers() refresh below.
+        const formElement = event.currentTarget
+        const form = new FormData(formElement)
         const response = await apiFetch('/api/admin/users', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -107,7 +110,7 @@ function UserManagement({ jwt }: { jwt: string }) {
         }
         const { inviteUrl, emailSent } = (await response.json()) as Omit<InviteResult, 'email'>
         setInvite({ email: String(form.get('email')), inviteUrl, emailSent })
-        event.currentTarget.reset()
+        formElement.reset()
         loadUsers()
     }
 
