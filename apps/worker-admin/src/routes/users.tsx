@@ -16,6 +16,13 @@ interface AdminUser {
     banReason: string | null
     banExpires: string | null
     createdAt: string
+    pending: boolean
+}
+
+interface InviteResult {
+    email: string
+    inviteUrl: string
+    emailSent: boolean
 }
 
 export const Route = createFileRoute('/users')({
@@ -58,7 +65,7 @@ function UsersRoute() {
 function UserManagement({ jwt }: { jwt: string }) {
     const [users, setUsers] = useState<AdminUser[] | null>(null)
     const [loadError, setLoadError] = useState<string | null>(null)
-    const [inviteUrl, setInviteUrl] = useState<string | null>(null)
+    const [invite, setInvite] = useState<InviteResult | null>(null)
 
     const apiFetch = useCallback(
         (path: string, init: RequestInit = {}) => {
@@ -98,10 +105,21 @@ function UserManagement({ jwt }: { jwt: string }) {
             setLoadError(await response.text().then(text => text || 'Could not create user.'))
             return
         }
-        const { inviteUrl: url } = (await response.json()) as { inviteUrl: string }
-        setInviteUrl(url)
+        const { inviteUrl, emailSent } = (await response.json()) as Omit<InviteResult, 'email'>
+        setInvite({ email: String(form.get('email')), inviteUrl, emailSent })
         event.currentTarget.reset()
         loadUsers()
+    }
+
+    async function handleResendInvite(id: string, email: string) {
+        setLoadError(null)
+        const response = await apiFetch(`/api/admin/users/${id}/invite`, { method: 'POST' })
+        if (!response.ok) {
+            setLoadError(await response.text().then(text => text || 'Could not resend invite.'))
+            return
+        }
+        const { inviteUrl, emailSent } = (await response.json()) as Omit<InviteResult, 'email'>
+        setInvite({ email, inviteUrl, emailSent })
     }
 
     async function handleRoleChange(id: string, role: string) {
@@ -163,9 +181,11 @@ function UserManagement({ jwt }: { jwt: string }) {
                 </label>
                 <button type="submit">Create user</button>
             </form>
-            {inviteUrl && (
-                <p>
-                    Invite link (copy and send to the new user): <input type="text" readOnly value={inviteUrl} size={60} />
+            {invite?.emailSent && <p>Invite sent to {invite.email}.</p>}
+            {invite && !invite.emailSent && (
+                <p style={{ color: 'red' }}>
+                    Couldn't email {invite.email}. Copy this invite link and send it yourself:{' '}
+                    <input type="text" readOnly value={invite.inviteUrl} size={60} />
                 </p>
             )}
 
@@ -194,8 +214,19 @@ function UserManagement({ jwt }: { jwt: string }) {
                                         ))}
                                     </select>
                                 </td>
-                                <td>{row.banned ? `Banned${row.banReason ? ` (${row.banReason})` : ''}` : 'Active'}</td>
                                 <td>
+                                    {row.banned
+                                        ? `Banned${row.banReason ? ` (${row.banReason})` : ''}`
+                                        : row.pending
+                                          ? 'Invited'
+                                          : 'Active'}
+                                </td>
+                                <td>
+                                    {row.pending && (
+                                        <button type="button" onClick={() => handleResendInvite(row.id, row.email)}>
+                                            Resend invite
+                                        </button>
+                                    )}
                                     <button type="button" onClick={() => handleBanToggle(row.id, row.banned)}>
                                         {row.banned ? 'Unban' : 'Ban'}
                                     </button>
