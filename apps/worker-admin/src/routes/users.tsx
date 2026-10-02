@@ -92,7 +92,7 @@ function UserManagement({ jwt }: { jwt: string }) {
         const response = await apiFetch('/api/admin/users', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ name: form.get('name'), email: form.get('email') })
+            body: JSON.stringify({ name: form.get('name'), email: form.get('email'), role: form.get('role') })
         })
         if (!response.ok) {
             setLoadError(await response.text().then(text => text || 'Could not create user.'))
@@ -150,6 +150,16 @@ function UserManagement({ jwt }: { jwt: string }) {
                 </label>
                 <label>
                     Email <input type="email" name="email" required />
+                </label>
+                <label>
+                    Role{' '}
+                    <select name="role" defaultValue="user">
+                        {ROLES.map(role => (
+                            <option key={role} value={role}>
+                                {role}
+                            </option>
+                        ))}
+                    </select>
                 </label>
                 <button type="submit">Create user</button>
             </form>
