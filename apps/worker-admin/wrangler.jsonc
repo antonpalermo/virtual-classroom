@@ -8,5 +8,10 @@
     "compatibility_date": "2026-08-22",
     "assets": {
         "not_found_handling": "single-page-application"
-    }
+    },
+    "observability": {
+        "enabled": true
+    },
+    "upload_source_maps": true,
+    "routes": [{ "pattern": "admin.klassroom.online", "custom_domain": true }]
 }
