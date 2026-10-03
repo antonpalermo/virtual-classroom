@@ -11,5 +11,6 @@
     },
     "observability": {
         "enabled": true
-    }
+    },
+    "routes": [{ "pattern": "dashboard.klassroom.online", "custom_domain": true }]
 }
