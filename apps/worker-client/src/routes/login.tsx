@@ -22,7 +22,11 @@ function LoginRoute() {
             scope: 'openid email profile',
             code_challenge: codeChallenge,
             code_challenge_method: 'S256',
-            state
+            state,
+            // Signing out only clears the stored token (src/routes/index.tsx's signOut), so a
+            // still-live worker-oidc session cookie — e.g. from a worker-admin sign-in on the same
+            // browser — would otherwise be silently reused. Same fix as worker-admin's login.tsx.
+            prompt: 'login'
         })
         window.location.href = `${OIDC_ORIGIN}/api/auth/oauth2/authorize?${params.toString()}`
     }
