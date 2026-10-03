@@ -3,7 +3,7 @@ import { eq, like } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, it, vi } from 'vitest'
 import { createDb } from '../worker/db/client.js'
 import { verification } from '../worker/db/schema.js'
-import { sendPasswordResetEmail } from '../worker/send-password-reset-email.js'
+import { sendPasswordResetEmail } from '../worker/send-email.js'
 import { callAsApp } from './helpers/call-app.js'
 import { seedUser } from './helpers/sign-in.js'
 

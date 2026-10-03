@@ -8,9 +8,9 @@ import { rateLimit } from './db/schema.js'
 // Mirrors better-auth's own database-backed rate limiter (node_modules/better-auth/dist/api/
 // rate-limiter/index.mjs's createDatabaseStorageWrapper) against the same `rate_limit` table
 // worker/auth.ts's rateLimit: { storage: 'database' } config already creates — trimmed to the one
-// path this worker needs (no plugin hooks, no configurable backends). Needed only for
-// POST /api/invites/accept, which sits outside Better Auth's own /api/auth/* handler and so never
-// sees its built-in limiter.
+// paths this worker needs (no plugin hooks, no configurable backends). Needed for
+// POST /api/invites/accept and POST /api/admin/users/:id/invite (worker/admin-users.ts), which sit
+// outside Better Auth's own /api/auth/* handler and so never see its built-in limiter.
 export async function consumeRateLimit(db: Db, key: string, windowSeconds: number, max: number, retried = false): Promise<boolean> {
     const now = Date.now()
     const windowInMs = windowSeconds * 1000
