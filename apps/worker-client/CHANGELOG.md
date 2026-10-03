@@ -1,5 +1,11 @@
 # @capstone/client
 
+## 0.2.1
+
+### Patch Changes
+
+- c71c33d: Force fresh authentication on sign-in (`prompt=login`) so a live worker-oidc session from another user — e.g. a worker-admin sign-in — isn't silently reused.
+
 ## 0.2.0
 
 ### Minor Changes
