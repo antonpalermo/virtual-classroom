@@ -4,7 +4,7 @@
 
 ## Layout
 
-- `configs/tsconfig.lib.json` — base for plain library code (e.g. `packages/web-standards`).
+- `configs/tsconfig.lib.json` — base for plain library code (e.g. `packages/lib-web-standards`).
 - `configs/tsconfig.worker.json` — base for Cloudflare Workers runtime code bundled directly by `wrangler` (e.g. `apps/worker-realtime`, `apps/worker-auth`).
 - `configs/tsconfig.app.json` — base for browser/React app code built with Vite (e.g. `apps/worker-client/tsconfig.app.json`, `apps/worker-admin/tsconfig.app.json`).
 - `configs/tsconfig.node.json` — base for Vite's own Node-side config and for the thin passthrough Worker that Vite's `@cloudflare/vite-plugin` bundles alongside the frontend (e.g. `apps/worker-client/tsconfig.node.json` + `tsconfig.worker.json`, `apps/worker-admin/tsconfig.node.json` + `tsconfig.worker.json`) — deliberately not on the stricter `tsconfig.worker.json` base, since that Worker code lives in the same bundler pipeline as the frontend rather than wrangler's own bundler.

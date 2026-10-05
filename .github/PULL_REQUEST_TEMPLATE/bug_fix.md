@@ -18,7 +18,7 @@ Fixes #
 
 - [ ] client
 - [ ] realtime
-- [ ] web-standards
+- [ ] lib-web-standards
 - [ ] config-typescript
 - [ ] root (not scoped to one workspace)
 

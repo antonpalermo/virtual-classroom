@@ -16,7 +16,7 @@ description: Use when creating a git commit in this repository — defines the r
 
 **Type** — one of the standard Conventional Commits types: `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `style`, `perf`, `build`, `ci`.
 
-**Scope** — the short workspace directory name: `client`, `realtime`, `web-standards`, `config-typescript`. Never the full `@capstone/*` package name.
+**Scope** — the short workspace directory name: `client`, `realtime`, `lib-web-standards`, `config-typescript`. Never the full `@capstone/*` package name.
 
 **Subject** — imperative mood ("add", not "added"/"adds"), short but informational (states what changed, not just "fix bug"), no trailing period.
 
