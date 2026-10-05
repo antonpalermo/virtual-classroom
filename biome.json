@@ -54,6 +54,17 @@
             "bracketSpacing": true
         }
     },
+    "overrides": [
+        {
+            "includes": ["packages/lib-ui/src/components/**"],
+            "linter": { "rules": { "style": { "useComponentExportOnlyModules": "off" } } }
+        }
+    ],
+    "css": {
+        "parser": {
+            "tailwindDirectives": true
+        }
+    },
     "html": {
         "formatter": {
             "indentScriptAndStyle": false,
