@@ -28,8 +28,15 @@
         "deny": [
             "Read(./**/worker-configuration.d.ts)",
             "Read(./package-lock.json)",
-            "Read(./packages/web-standards/src/status-codes.ts)",
-            "Read(./packages/web-standards/src/status-phrases.ts)"
+            "Read(./.env)",
+            "Read(./.env.*)",
+            "Read(./.dev.vars)",
+            "Read(./.dev.vars.*)",
+            "Read(./secrets/**)",
+            "Bash(cat .env)",
+            "Bash(cat .env.*)",
+            "Bash(cat .dev.vars)",
+            "Bash(cat .dev.vars.*)"
         ],
         "ask": [
             "Bash(rm -rf:*)",
