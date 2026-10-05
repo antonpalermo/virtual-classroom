@@ -30,7 +30,7 @@ Per the branching strategy in the root `CLAUDE.md`:
 
 This repo has no issue tracker (see CLAUDE.md branching section). The `bug_fix.md` and `feature.md` templates still carry a `Related issue` / `Fixes #` section — **delete that section** rather than leaving `Fixes #` with no number. Same rule for any other template placeholder comment (`<!-- ... -->`) or checklist item that doesn't apply: remove it, don't leave it dangling.
 
-`Workspace(s) affected` must be checked against the real workspace list (`client`, `realtime`, `web-standards`, `config-typescript`, `root`) for *this* change — not left as an unexamined copy of the template.
+`Workspace(s) affected` must be checked against the real workspace list (`client`, `realtime`, `lib-web-standards`, `config-typescript`, `root`) for *this* change — not left as an unexamined copy of the template.
 
 ## A checked box is evidence, not intent
 

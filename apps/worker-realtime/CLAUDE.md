@@ -23,4 +23,4 @@ No code here talks to `worker-client` yet — the two workers deploy independent
 - `deploy` — `wrangler deploy`
 - `typegen` — `wrangler types` (regenerates `worker-configuration.d.ts`)
 
-Depends on `@capstone/standards` for HTTP status constants (see `packages/web-standards/CLAUDE.md`).
+Depends on `@capstone/standards` for HTTP status constants (see `packages/lib-web-standards/CLAUDE.md`).
