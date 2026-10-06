@@ -1,3 +1,5 @@
+import { Button } from '@capstone/ui/components/button'
+import { Card, CardContent, CardFooter } from '@capstone/ui/components/card'
 import { createFileRoute } from '@tanstack/react-router'
 import { createPkcePair } from '../lib/pkce'
 
@@ -32,11 +34,26 @@ function LoginRoute() {
     }
 
     return (
-        <div className="p-2">
-            <h3>Sign in</h3>
-            <button type="button" onClick={signIn}>
-                Sign in
-            </button>
+        <div className="flex min-h-svh flex-col items-center justify-center bg-muted p-6 md:p-10">
+            <Card className="w-full max-w-sm overflow-hidden md:max-w-3xl">
+                <CardContent className="grid gap-6 p-8 md:grid-cols-2">
+                    <div className="flex flex-col justify-center gap-6">
+                        <div className="flex flex-col gap-2">
+                            <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
+                            <p className="text-sm text-muted-foreground">Sign in to continue to your virtual classroom</p>
+                        </div>
+                        <Button type="button" onClick={signIn} size="lg">
+                            Sign in
+                        </Button>
+                    </div>
+                    <div className="hidden bg-gradient-to-b from-muted to-muted/50 md:block" />
+                </CardContent>
+                <CardFooter className="border-t px-8 py-6">
+                    <p className="text-xs text-muted-foreground">
+                        By clicking continue, you agree to our Terms of Service and Privacy Policy
+                    </p>
+                </CardFooter>
+            </Card>
         </div>
     )
 }
