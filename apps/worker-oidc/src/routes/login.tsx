@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { GoogleButton } from '../GoogleButton'
 import { useAppForm } from '../lib/form'
 import { buildAuthorizeResumeQuery } from '../lib/resume-authorize-query'
-import { all, email, required } from '../lib/validators'
+import { emailSchema, passwordSchema, validateWith } from '../lib/validators'
 
 export const Route = createFileRoute('/login')({
     component: LoginRoute
@@ -17,9 +17,6 @@ function loginError() {
     const code = new URLSearchParams(window.location.search).get('error')
     return code === 'not_authorized' ? "This account isn't authorized to sign in here." : null
 }
-
-const validateEmail = all(required('Email is required'), email())
-const validatePassword = required('Password is required')
 
 function LoginRoute() {
     const [clientName, setClientName] = useState<string | null>(null)
@@ -83,10 +80,10 @@ function LoginRoute() {
                         <p className="text-sm text-muted-foreground">Enter your email below to sign in to your account</p>
                     </div>
                     <FieldGroup>
-                        <form.AppField name="email" validators={{ onBlur: validateEmail, onSubmit: validateEmail }}>
+                        <form.AppField name="email" validators={validateWith(emailSchema)}>
                             {field => <field.TextField label="Email" type="email" placeholder="jane.doe@example.com" />}
                         </form.AppField>
-                        <form.AppField name="password" validators={{ onBlur: validatePassword, onSubmit: validatePassword }}>
+                        <form.AppField name="password" validators={validateWith(passwordSchema)}>
                             {field => (
                                 <field.TextField
                                     label="Password"

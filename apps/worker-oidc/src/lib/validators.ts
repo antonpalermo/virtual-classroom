@@ -1,20 +1,8 @@
-// Reusable TanStack Form field validators: return an error message, or undefined when valid.
-export const required =
-    (message = 'This field is required') =>
-    ({ value }: { value: string }) =>
-        value.trim() ? undefined : message
+import { z } from 'zod'
 
-export const email =
-    (message = 'Enter a valid email address') =>
-    ({ value }: { value: string }) =>
-        !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? undefined : message
+export const emailSchema = z.string().trim().min(1, 'Email is required').pipe(z.email('Enter a valid email address'))
+export const passwordSchema = z.string().min(1, 'Password is required')
 
-// Runs validators in order, reports the first error.
-export const all =
-    (...validators: Array<(arg: { value: string }) => string | undefined>) =>
-    (arg: { value: string }) => {
-        for (const validate of validators) {
-            const message = validate(arg)
-            if (message) return message
-        }
-    }
+// Reusable for any form field: `<form.AppField validators={validateWith(schema)}>`.
+// TanStack Form accepts Zod (Standard Schema) directly; validates on blur, then again on submit.
+export const validateWith = (schema: z.ZodType<unknown, string>) => ({ onBlur: schema, onSubmit: schema })

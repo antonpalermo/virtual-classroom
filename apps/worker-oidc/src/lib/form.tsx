@@ -24,7 +24,7 @@ function TextField({ label, aside, ...props }: { label: string; aside?: ReactNod
                 aria-invalid={invalid}
                 {...props}
             />
-            {invalid && <FieldError errors={field.state.meta.errors.map(message => ({ message }))} />}
+            {invalid && <FieldError errors={field.state.meta.errors} />}
         </Field>
     )
 }
