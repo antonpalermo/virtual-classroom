@@ -1,3 +1,4 @@
+import { Button } from '@capstone/ui/components/button'
 import { useState } from 'react'
 import { buildAuthorizeResumeQuery } from './lib/resume-authorize-query'
 
@@ -54,10 +55,10 @@ export function GoogleButton({ oauthQuery }: { oauthQuery: string }) {
 
     return (
         <>
-            <button type="button" onClick={handleClick} disabled={busy}>
+            <Button type="button" variant="outline" onClick={handleClick} disabled={busy}>
                 Continue with Google
-            </button>
-            {error && <p style={{ color: 'red' }}>{error}</p>}
+            </Button>
+            {error && <p className="text-sm text-destructive">{error}</p>}
         </>
     )
 }

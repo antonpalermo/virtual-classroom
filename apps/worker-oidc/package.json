@@ -19,13 +19,15 @@
         "@better-auth/oauth-provider": "^1.7.1",
         "@capstone/auth-verify": "*",
         "@capstone/ui": "*",
+        "@tanstack/react-form": "^1.33.5",
         "@tanstack/react-router": "^1.170.31",
         "@tanstack/react-router-devtools": "^1.167.1",
         "better-auth": "^1.7.1",
         "drizzle-orm": "^0.45.2",
         "hono": "^4.13.5",
         "react": "^19.2.8",
-        "react-dom": "^19.2.8"
+        "react-dom": "^19.2.8",
+        "zod": "^4.4.3"
     },
     "devDependencies": {
         "@capstone/typescript": "*",
