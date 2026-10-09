@@ -29,6 +29,16 @@ export function clearStoredJwt() {
 const OIDC_ORIGIN = import.meta.env.VITE_OIDC_ORIGIN ?? 'http://localhost:8791'
 const CLIENT_ID = import.meta.env.VITE_OIDC_CLIENT_ID ?? ''
 
+const RETURN_TO_KEY = 'oidc_return_to'
+
+// Consumes the path redirectToSignIn stashed. Only same-origin paths ('/x', never '//host' or
+// 'https://…') come back, so a tampered value can't turn this into an open redirect.
+export function takeReturnTo() {
+    const returnTo = sessionStorage.getItem(RETURN_TO_KEY)
+    sessionStorage.removeItem(RETURN_TO_KEY)
+    return returnTo?.startsWith('/') && !returnTo.startsWith('//') && !returnTo.startsWith('/\\') ? returnTo : '/'
+}
+
 // Sends the browser straight to worker-oidc's /login (via its authorize endpoint) — this app has
 // no sign-in page of its own. src/routes/auth-callback.tsx finishes the exchange.
 export async function redirectToSignIn() {
@@ -36,6 +46,11 @@ export async function redirectToSignIn() {
     const state = crypto.randomUUID()
     sessionStorage.setItem('oidc_code_verifier', codeVerifier)
     sessionStorage.setItem('oidc_state', state)
+    // Remember the deep link so auth-callback can return to it. A retry from /auth-callback itself
+    // keeps the path stashed by the original attempt.
+    if (window.location.pathname !== '/auth-callback') {
+        sessionStorage.setItem(RETURN_TO_KEY, window.location.pathname + window.location.search)
+    }
 
     const params = new URLSearchParams({
         client_id: CLIENT_ID,

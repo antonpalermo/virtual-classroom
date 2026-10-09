@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import { redirectToSignIn, storeJwt } from '../lib/auth-client'
+import { redirectToSignIn, storeJwt, takeReturnTo } from '../lib/auth-client'
 
 const OIDC_ORIGIN = import.meta.env.VITE_OIDC_ORIGIN ?? 'http://localhost:8791'
 const CLIENT_ID = import.meta.env.VITE_OIDC_CLIENT_ID ?? ''
@@ -8,7 +8,7 @@ export const Route = createFileRoute('/auth-callback')({
     // In beforeLoad, not a useEffect: StrictMode double-runs effects in dev, and the second run —
     // finding the verifier already consumed — would restart sign-in mid-exchange.
     beforeLoad: async () => {
-        if (await exchangeCode()) throw redirect({ to: '/' })
+        if (await exchangeCode()) throw redirect({ href: takeReturnTo() })
         await redirectToSignIn()
         // Never resolves: the page is already navigating away.
         return new Promise<never>(() => {})
