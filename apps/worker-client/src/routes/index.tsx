@@ -1,10 +1,5 @@
-import { type AccessTokenClaims, verifyAccessToken } from '@capstone/auth-verify'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
-import { clearStoredJwt, getStoredJwt } from '../lib/auth-client'
-
-const OIDC_ORIGIN = import.meta.env.VITE_OIDC_ORIGIN ?? 'http://localhost:8791'
-const JWKS_URL = `${OIDC_ORIGIN}/api/auth/jwks`
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { clearStoredJwt, redirectToSignIn } from '../lib/auth-client'
 
 export const Route = createFileRoute('/')({
     component: HomeRoute
@@ -12,18 +7,7 @@ export const Route = createFileRoute('/')({
 
 function HomeRoute() {
     const navigate = useNavigate()
-    const [claims, setClaims] = useState<AccessTokenClaims | null | undefined>(undefined)
-
-    useEffect(() => {
-        const token = getStoredJwt()
-        if (!token) {
-            setClaims(null)
-            return
-        }
-        verifyAccessToken(token, JWKS_URL).then(setClaims)
-    }, [])
-
-    const isPending = claims === undefined
+    const { claims } = Route.useRouteContext()
 
     function createRoom() {
         const id = crypto.randomUUID()
@@ -32,25 +16,18 @@ function HomeRoute() {
 
     function signOut() {
         clearStoredJwt()
-        setClaims(null)
+        redirectToSignIn()
     }
 
     return (
         <div className="p-2">
             <h3>Welcome!</h3>
-            {!isPending &&
-                (claims ? (
-                    <p>
-                        Signed in as {claims.email}{' '}
-                        <button type="button" onClick={signOut}>
-                            Sign out
-                        </button>
-                    </p>
-                ) : (
-                    <p>
-                        <Link to="/login">Sign in</Link>
-                    </p>
-                ))}
+            <p>
+                Signed in as {claims?.email}{' '}
+                <button type="button" onClick={signOut}>
+                    Sign out
+                </button>
+            </p>
             <form>
                 <div>
                     <label htmlFor="room-id">Join</label>

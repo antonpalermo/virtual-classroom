@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthCallbackRouteImport } from './routes/auth-callback'
-import { Route as LoginRouteImport } from './routes/login'
 import { Route as RoomRouteImport } from './routes/room'
 
 const IndexRoute = IndexRouteImport.update({
@@ -24,11 +23,6 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth-callback',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const RoomRoute = RoomRouteImport.update({
   id: '/room',
   path: '/room',
@@ -38,34 +32,30 @@ const RoomRoute = RoomRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth-callback': typeof AuthCallbackRoute
-  '/login': typeof LoginRoute
   '/room': typeof RoomRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth-callback': typeof AuthCallbackRoute
-  '/login': typeof LoginRoute
   '/room': typeof RoomRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth-callback': typeof AuthCallbackRoute
-  '/login': typeof LoginRoute
   '/room': typeof RoomRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth-callback' | '/login' | '/room'
+  fullPaths: '/' | '/auth-callback' | '/room'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth-callback' | '/login' | '/room'
-  id: '__root__' | '/' | '/auth-callback' | '/login' | '/room'
+  to: '/' | '/auth-callback' | '/room'
+  id: '__root__' | '/' | '/auth-callback' | '/room'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
-  LoginRoute: typeof LoginRoute
   RoomRoute: typeof RoomRoute
 }
 
@@ -85,13 +75,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/room': {
       id: '/room'
       path: '/room'
@@ -105,7 +88,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthCallbackRoute: AuthCallbackRoute,
-  LoginRoute: LoginRoute,
   RoomRoute: RoomRoute,
 }
 export const routeTree = rootRouteImport
