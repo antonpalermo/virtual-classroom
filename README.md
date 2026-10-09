@@ -115,7 +115,7 @@ Each returns `{"client_id": "..."}`. Put it in that app's env file as `VITE_OIDC
 
 1. Add its name to `CLIENT_NAMES` in `apps/worker-oidc/worker/register-oauth-client.ts` (any other name 404s).
 2. Run the `curl` above with the new name and its `redirect_uri` (use the app's real origin plus its callback path).
-3. In the new app, implement Authorization Code + PKCE against `<oidc origin>/api/auth/oauth2/authorize` and `/api/auth/oauth2/token`, and verify tokens with `@capstone/auth-verify` — copy `apps/worker-client/src/routes/login.tsx` and `auth-callback.tsx` as the reference.
+3. In the new app, implement Authorization Code + PKCE against `<oidc origin>/api/auth/oauth2/authorize` and `/api/auth/oauth2/token`, and verify tokens with `@capstone/auth-verify` — copy `apps/worker-client/src/lib/auth-client.ts`'s `redirectToSignIn` and `src/routes/auth-callback.tsx` as the reference.
 4. Add the app's origin to CORS in `worker/index.ts` only if it calls `worker-oidc` cross-origin beyond `/jwks`, `/oauth2/userinfo` and `/oauth2/token` (already open).
 
 Note: `worker-admin` additionally rejects non-admin accounts at authorize time (`worker/restrict-worker-admin-client.ts`); other clients are open to any signed-in user.
