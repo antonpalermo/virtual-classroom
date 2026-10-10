@@ -1,10 +1,8 @@
-import { type AccessTokenClaims, verifyAccessToken } from '@capstone/auth-verify'
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
-import { clearStoredJwt, getStoredJwt } from '../lib/auth-client'
+import { getStoredJwt } from '../lib/auth-client'
 
 const OIDC_ORIGIN = import.meta.env.VITE_OIDC_ORIGIN ?? 'http://localhost:8791'
-const JWKS_URL = `${OIDC_ORIGIN}/api/auth/jwks`
 const ROLES = ['user', 'admin'] as const
 
 interface AdminUser {
@@ -26,37 +24,15 @@ interface InviteResult {
 }
 
 export const Route = createFileRoute('/users')({
-    beforeLoad: () => {
-        if (!getStoredJwt()) throw redirect({ to: '/login' })
-    },
     component: UsersRoute
 })
 
 function UsersRoute() {
-    // Same three-state split as index.tsx: still-resolving, resolved-but-invalid, and
-    // resolved-with-claims stay distinct so a stale token doesn't flash the table first.
-    const [claims, setClaims] = useState<AccessTokenClaims | null | undefined>(undefined)
+    const { claims } = Route.useRouteContext()
 
-    useEffect(() => {
-        const jwt = getStoredJwt()
-        if (!jwt) return
-        verifyAccessToken(jwt, JWKS_URL).then(setClaims)
-    }, [])
-
-    const isPending = claims === undefined
-    const tokenIsStale = !isPending && !claims
-
-    useEffect(() => {
-        if (!tokenIsStale) return
-        clearStoredJwt()
-        window.location.href = '/login'
-    }, [tokenIsStale])
-
-    if (isPending) return <p className="p-2">Loading…</p>
-    if (tokenIsStale) return <p className="p-2">Your session has expired. Redirecting to sign in…</p>
-    // claims is narrowed to non-null past this point, but claims.role is only ever meaningful
-    // for UI gating here — the API re-checks it fresh against D1 on every call, so a forged or
-    // stale role claim in this token can't grant anything the server wouldn't already allow.
+    // claims.role is only ever meaningful for UI gating here — the API re-checks it fresh against
+    // D1 on every call, so a forged or stale role claim in this token can't grant anything the
+    // server wouldn't already allow.
     if (claims?.role !== 'admin') return <p className="p-2">You're not authorized to manage users.</p>
 
     return <UserManagement jwt={getStoredJwt() ?? ''} />
