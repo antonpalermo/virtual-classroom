@@ -1,9 +1,11 @@
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@capstone/ui/components/select'
 import { createFileRoute } from '@tanstack/react-router'
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { CreateUserDialog, type NewUser } from '../components/create-user-dialog'
 import { getStoredJwt } from '../lib/auth-client'
+import { ROLES } from '../lib/validators'
 
 const OIDC_ORIGIN = import.meta.env.VITE_OIDC_ORIGIN ?? 'http://localhost:8791'
-const ROLES = ['user', 'admin'] as const
 
 interface AdminUser {
     id: string
@@ -68,26 +70,19 @@ function UserManagement({ jwt }: { jwt: string }) {
         loadUsers()
     }, [loadUsers])
 
-    async function handleCreate(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault()
+    // Returns the error to show in the dialog, or null on success.
+    async function handleCreate(user: NewUser) {
         setLoadError(null)
-        // Captured before the first await: React nulls event.currentTarget once the handler yields,
-        // so reading it after the fetch threw and skipped the loadUsers() refresh below.
-        const formElement = event.currentTarget
-        const form = new FormData(formElement)
         const response = await apiFetch('/api/admin/users', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ name: form.get('name'), email: form.get('email'), role: form.get('role') })
+            body: JSON.stringify({ name: user.name, email: user.email, role: user.role })
         })
-        if (!response.ok) {
-            setLoadError(await response.text().then(text => text || 'Could not create user.'))
-            return
-        }
+        if (!response.ok) return await response.text().then(text => text || 'Could not create user.')
         const { inviteUrl, emailSent } = (await response.json()) as Omit<InviteResult, 'email'>
-        setInvite({ email: String(form.get('email')), inviteUrl, emailSent })
-        formElement.reset()
+        setInvite({ email: user.email, inviteUrl, emailSent })
         loadUsers()
+        return null
     }
 
     async function handleResendInvite(id: string, email: string) {
@@ -141,25 +136,7 @@ function UserManagement({ jwt }: { jwt: string }) {
             <h3>Users</h3>
             {loadError && <p style={{ color: 'red' }}>{loadError}</p>}
 
-            <form onSubmit={handleCreate}>
-                <label>
-                    Name <input type="text" name="name" required />
-                </label>
-                <label>
-                    Email <input type="email" name="email" required />
-                </label>
-                <label>
-                    Role{' '}
-                    <select name="role" defaultValue="user">
-                        {ROLES.map(role => (
-                            <option key={role} value={role}>
-                                {role}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-                <button type="submit">Create user</button>
-            </form>
+            <CreateUserDialog onCreate={handleCreate} />
             {invite?.emailSent && <p>Invite sent to {invite.email}.</p>}
             {invite && !invite.emailSent && (
                 <p style={{ color: 'red' }}>
@@ -185,13 +162,18 @@ function UserManagement({ jwt }: { jwt: string }) {
                             <tr key={row.id}>
                                 <td>{row.email}</td>
                                 <td>
-                                    <select value={row.role} onChange={event => handleRoleChange(row.id, event.target.value)}>
-                                        {ROLES.map(role => (
-                                            <option key={role} value={role}>
-                                                {role}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <Select value={row.role} onValueChange={role => role && handleRoleChange(row.id, role)}>
+                                        <SelectTrigger size="sm" aria-label={`Role for ${row.email}`}>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {ROLES.map(role => (
+                                                <SelectItem key={role} value={role}>
+                                                    {role}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </td>
                                 <td>
                                     {row.banned
