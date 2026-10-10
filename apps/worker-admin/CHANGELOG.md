@@ -1,5 +1,11 @@
 # @capstone/admin
 
+## 0.6.0
+
+### Minor Changes
+
+- edddde4: Remove the `/login` route; unauthenticated visitors are now redirected straight to worker-oidc's sign-in page and returned to the page they originally opened after signing in.
+
 ## 0.5.0
 
 ### Minor Changes
