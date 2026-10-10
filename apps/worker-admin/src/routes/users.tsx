@@ -33,7 +33,7 @@ function UsersRoute() {
     // claims.role is only ever meaningful for UI gating here — the API re-checks it fresh against
     // D1 on every call, so a forged or stale role claim in this token can't grant anything the
     // server wouldn't already allow.
-    if (claims?.role !== 'admin') return <p className="p-2">You're not authorized to manage users.</p>
+    if (claims?.role !== 'admin') return <p>You're not authorized to manage users.</p>
 
     return <UserManagement jwt={getStoredJwt() ?? ''} />
 }
@@ -137,7 +137,7 @@ function UserManagement({ jwt }: { jwt: string }) {
     }
 
     return (
-        <div className="p-2">
+        <div>
             <h3>Users</h3>
             {loadError && <p style={{ color: 'red' }}>{loadError}</p>}
 

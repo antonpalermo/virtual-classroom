@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { clearStoredJwt, redirectToSignIn } from '../lib/auth-client'
+import { signOut } from '../lib/auth-client'
 
 export const Route = createFileRoute('/')({
     component: DashboardRoute
@@ -8,13 +8,8 @@ export const Route = createFileRoute('/')({
 function DashboardRoute() {
     const { claims } = Route.useRouteContext()
 
-    function signOut() {
-        clearStoredJwt()
-        redirectToSignIn()
-    }
-
     return (
-        <div className="p-2">
+        <div>
             <p>Signed in as {claims?.email}</p>
             {claims?.role === 'admin' && (
                 <p>
