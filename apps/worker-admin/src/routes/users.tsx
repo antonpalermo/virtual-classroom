@@ -1,7 +1,17 @@
+import { Button } from '@capstone/ui/components/button'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger
+} from '@capstone/ui/components/dropdown-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@capstone/ui/components/select'
 import { createFileRoute } from '@tanstack/react-router'
+import { MoreHorizontal } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { CreateUserDialog, type NewUser } from '../components/create-user-dialog'
+import { DataTable, type DataTableColumn } from '../components/data-table'
 import { getStoredJwt } from '../lib/auth-client'
 import { ROLES } from '../lib/validators'
 
@@ -131,6 +141,56 @@ function UserManagement({ jwt }: { jwt: string }) {
         loadUsers()
     }
 
+    const columns: DataTableColumn<AdminUser>[] = [
+        { accessorKey: 'email', header: 'Email' },
+        {
+            accessorKey: 'role',
+            header: 'Role',
+            cell: ({ row: { original: row } }) => (
+                <Select value={row.role} onValueChange={role => role && handleRoleChange(row.id, role)}>
+                    <SelectTrigger size="sm" aria-label={`Role for ${row.email}`}>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {ROLES.map(role => (
+                            <SelectItem key={role} value={role}>
+                                {role}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            )
+        },
+        {
+            id: 'status',
+            header: 'Status',
+            cell: ({ row: { original: row } }) =>
+                row.banned ? `Banned${row.banReason ? ` (${row.banReason})` : ''}` : row.pending ? 'Invited' : 'Active'
+        },
+        {
+            id: 'actions',
+            cell: ({ row: { original: row } }) => (
+                <DropdownMenu>
+                    <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Actions for ${row.email}`} />}>
+                        <MoreHorizontal />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-auto">
+                        {row.pending && (
+                            <DropdownMenuItem onClick={() => handleResendInvite(row.id, row.email)}>Resend invite</DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => handleBanToggle(row.id, row.banned)}>
+                            {row.banned ? 'Unban' : 'Ban'}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem variant="destructive" onClick={() => handleDelete(row.id)}>
+                            Delete
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )
+        }
+    ]
+
     return (
         <div>
             <h3>Users</h3>
@@ -147,59 +207,7 @@ function UserManagement({ jwt }: { jwt: string }) {
 
             {users === null && <p>Loading users…</p>}
             {users !== null && users.length === 0 && <p>No users yet.</p>}
-            {users !== null && users.length > 0 && (
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {users.map(row => (
-                            <tr key={row.id}>
-                                <td>{row.email}</td>
-                                <td>
-                                    <Select value={row.role} onValueChange={role => role && handleRoleChange(row.id, role)}>
-                                        <SelectTrigger size="sm" aria-label={`Role for ${row.email}`}>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {ROLES.map(role => (
-                                                <SelectItem key={role} value={role}>
-                                                    {role}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </td>
-                                <td>
-                                    {row.banned
-                                        ? `Banned${row.banReason ? ` (${row.banReason})` : ''}`
-                                        : row.pending
-                                          ? 'Invited'
-                                          : 'Active'}
-                                </td>
-                                <td>
-                                    {row.pending && (
-                                        <button type="button" onClick={() => handleResendInvite(row.id, row.email)}>
-                                            Resend invite
-                                        </button>
-                                    )}
-                                    <button type="button" onClick={() => handleBanToggle(row.id, row.banned)}>
-                                        {row.banned ? 'Unban' : 'Ban'}
-                                    </button>
-                                    <button type="button" onClick={() => handleDelete(row.id)}>
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            )}
+            {users !== null && users.length > 0 && <DataTable columns={columns} data={users} getRowId={row => row.id} />}
         </div>
     )
 }
