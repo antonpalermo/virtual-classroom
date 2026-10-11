@@ -1,3 +1,13 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
+} from '@capstone/ui/components/alert-dialog'
 import { Button } from '@capstone/ui/components/button'
 import {
     DropdownMenu,
@@ -54,6 +64,7 @@ function UserManagement({ jwt }: { jwt: string }) {
     const [users, setUsers] = useState<AdminUser[] | null>(null)
     const [loadError, setLoadError] = useState<string | null>(null)
     const [invite, setInvite] = useState<InviteResult | null>(null)
+    const [pendingDelete, setPendingDelete] = useState<AdminUser | null>(null)
 
     const apiFetch = useCallback(
         (path: string, init: RequestInit = {}) => {
@@ -131,7 +142,7 @@ function UserManagement({ jwt }: { jwt: string }) {
     }
 
     async function handleDelete(id: string) {
-        if (!window.confirm('Delete this user? This cannot be undone.')) return
+        setPendingDelete(null)
         setLoadError(null)
         const response = await apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' })
         if (!response.ok) {
@@ -182,7 +193,7 @@ function UserManagement({ jwt }: { jwt: string }) {
                             {row.banned ? 'Unban' : 'Ban'}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem variant="destructive" onClick={() => handleDelete(row.id)}>
+                        <DropdownMenuItem variant="destructive" onClick={() => setPendingDelete(row)}>
                             Delete
                         </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -208,6 +219,23 @@ function UserManagement({ jwt }: { jwt: string }) {
             {users === null && <p>Loading users…</p>}
             {users !== null && users.length === 0 && <p>No users yet.</p>}
             {users !== null && users.length > 0 && <DataTable columns={columns} data={users} getRowId={row => row.id} />}
+
+            <AlertDialog open={pendingDelete !== null} onOpenChange={open => !open && setPendingDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this user?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {pendingDelete?.email} will be permanently deleted. This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction variant="destructive" onClick={() => pendingDelete && handleDelete(pendingDelete.id)}>
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }
