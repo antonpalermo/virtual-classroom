@@ -1,5 +1,6 @@
 import { type AccessTokenClaims, verifyAccessToken } from '@capstone/auth-verify'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@capstone/ui/components/sidebar'
+import { Toaster } from '@capstone/ui/components/sonner'
 import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { AppSidebar } from '../components/app-sidebar'
@@ -29,6 +30,7 @@ function RootLayout() {
                     <Outlet />
                 </div>
             </SidebarInset>
+            <Toaster />
             <TanStackRouterDevtools />
         </SidebarProvider>
     )

@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createFileRoute } from '@tanstack/react-router'
 import { MoreHorizontal } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { CreateUserDialog, type NewUser } from '../components/create-user-dialog'
 import { DataTable, type DataTableColumn } from '../components/data-table'
 import { getStoredJwt } from '../lib/auth-client'
@@ -141,14 +142,16 @@ function UserManagement({ jwt }: { jwt: string }) {
         loadUsers()
     }
 
-    async function handleDelete(id: string) {
+    async function handleDelete(user: AdminUser) {
         setPendingDelete(null)
         setLoadError(null)
-        const response = await apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' })
-        if (!response.ok) {
-            setLoadError(await response.text().then(text => text || 'Could not delete user.'))
+        // A network failure throws instead of returning a response; toast it like any other failure.
+        const response = await apiFetch(`/api/admin/users/${user.id}`, { method: 'DELETE' }).catch(() => null)
+        if (!response?.ok) {
+            toast.error((await response?.text().catch(() => '')) || 'Could not delete user.')
             return
         }
+        toast.success(`Deleted ${user.email}.`)
         loadUsers()
     }
 
@@ -230,7 +233,7 @@ function UserManagement({ jwt }: { jwt: string }) {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction variant="destructive" onClick={() => pendingDelete && handleDelete(pendingDelete.id)}>
+                        <AlertDialogAction variant="destructive" onClick={() => pendingDelete && handleDelete(pendingDelete)}>
                             Delete
                         </AlertDialogAction>
                     </AlertDialogFooter>
