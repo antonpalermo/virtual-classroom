@@ -2,7 +2,8 @@ import { env } from 'cloudflare:workers'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, it, vi } from 'vitest'
 import { createDb } from '../worker/db/client.js'
-import { invite, user } from '../worker/db/schema.js'
+import { invite, oauthClient, user } from '../worker/db/schema.js'
+import { BOOTSTRAP_USER_ID } from '../worker/register-oauth-client.js'
 import { callAsApp } from './helpers/call-app.js'
 import { seedUser, signInForTokens } from './helpers/sign-in.js'
 
@@ -351,6 +352,35 @@ describe('admin user-management API', () => {
 
         const del = await call(`/api/admin/users/${self.id}`, id_token, { method: 'DELETE' })
         expect(del.status).toBe(400)
+    })
+
+    it('hides the OAuth-client bootstrap user from the list and refuses to touch it', async ({ expect }) => {
+        const token = await adminToken('bootstrap-guard-admin@example.com')
+        const db = createDb(env.OIDC_DB)
+        const clientsBefore = await db.select().from(oauthClient).where(eq(oauthClient.userId, BOOTSTRAP_USER_ID))
+        expect(clientsBefore.length).toBeGreaterThan(0)
+
+        const list = await (await call('/api/admin/users', token)).json<{ users: { id: string }[] }>()
+        expect(list.users.map(row => row.id)).not.toContain(BOOTSTRAP_USER_ID)
+
+        const json = { 'content-type': 'application/json' }
+        const attempts = [
+            call(`/api/admin/users/${BOOTSTRAP_USER_ID}`, token, { method: 'DELETE' }),
+            call(`/api/admin/users/${BOOTSTRAP_USER_ID}`, token, {
+                method: 'PATCH',
+                headers: json,
+                body: JSON.stringify({ role: 'admin' })
+            }),
+            call(`/api/admin/users/${BOOTSTRAP_USER_ID}/ban`, token, { method: 'POST' }),
+            call(`/api/admin/users/${BOOTSTRAP_USER_ID}/unban`, token, { method: 'POST' }),
+            call(`/api/admin/users/${BOOTSTRAP_USER_ID}/invite`, token, { method: 'POST' })
+        ]
+        for (const response of await Promise.all(attempts)) expect(response.status).toBe(404)
+
+        const [bootstrapUser] = await db.select().from(user).where(eq(user.id, BOOTSTRAP_USER_ID)).limit(1)
+        expect(bootstrapUser).toMatchObject({ role: 'user', banned: false })
+        const clientsAfter = await db.select().from(oauthClient).where(eq(oauthClient.userId, BOOTSTRAP_USER_ID))
+        expect(clientsAfter).toHaveLength(clientsBefore.length)
     })
 
     it('opens CORS on /api/admin/users', async ({ expect }) => {
