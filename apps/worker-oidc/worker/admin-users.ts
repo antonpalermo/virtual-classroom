@@ -9,6 +9,7 @@ import { createAuth } from './auth.js'
 import { createDb, type Db } from './db/client.js'
 import { account, invite, user } from './db/schema.js'
 import { consumeRateLimit } from './rate-limit.js'
+import { BOOTSTRAP_USER_ID } from './register-oauth-client.js'
 import { sendInviteEmail } from './send-email.js'
 
 const ROLES = ['user', 'admin'] as const
@@ -77,6 +78,13 @@ async function issueInvite(db: Db, env: Env, userId: string, email: string) {
 
 export function registerAdminUsersRoutes(app: Hono<{ Bindings: Env }>) {
     app.use('/api/admin/*', cors())
+    // The bootstrap user owns every registered OAuth client (worker/register-oauth-client.ts), and
+    // oauth_client cascades on user delete — deleting it would silently unregister every client and
+    // break sign-in everywhere. Hide it from this API entirely: unlisted, and 404 on every :id route.
+    app.use('/api/admin/users/:id/*', async (c, next) => {
+        if (c.req.param('id') === BOOTSTRAP_USER_ID) return c.text('User not found', 404)
+        await next()
+    })
 
     app.get('/api/admin/users', async c => {
         const gate = await requireAdmin(c)
@@ -99,6 +107,7 @@ export function registerAdminUsersRoutes(app: Hono<{ Bindings: Env }>) {
                 pending: sql<boolean>`not exists (select 1 from "account" where "account"."user_id" = "user"."id")`.mapWith(Boolean)
             })
             .from(user)
+            .where(ne(user.id, BOOTSTRAP_USER_ID))
         return c.json({ users: rows })
     })
 
