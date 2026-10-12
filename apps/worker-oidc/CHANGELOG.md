@@ -1,5 +1,11 @@
 # @capstone/openid-connect
 
+## 0.5.1
+
+### Patch Changes
+
+- 3ea74c7: Hide the OAuth-client bootstrap user from the admin users API: it's no longer listed and every `/api/admin/users/:id` route 404s for it, so deleting it can't cascade away every registered OAuth client.
+
 ## 0.5.0
 
 ### Minor Changes
