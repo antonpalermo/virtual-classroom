@@ -1,9 +1,32 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
+} from '@capstone/ui/components/alert-dialog'
+import { Button } from '@capstone/ui/components/button'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger
+} from '@capstone/ui/components/dropdown-menu'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@capstone/ui/components/select'
 import { createFileRoute } from '@tanstack/react-router'
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { MoreHorizontal } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
+import { CreateUserDialog, type NewUser } from '../components/create-user-dialog'
+import { DataTable, type DataTableColumn } from '../components/data-table'
 import { getStoredJwt } from '../lib/auth-client'
+import { ROLES } from '../lib/validators'
 
 const OIDC_ORIGIN = import.meta.env.VITE_OIDC_ORIGIN ?? 'http://localhost:8791'
-const ROLES = ['user', 'admin'] as const
 
 interface AdminUser {
     id: string
@@ -33,7 +56,7 @@ function UsersRoute() {
     // claims.role is only ever meaningful for UI gating here — the API re-checks it fresh against
     // D1 on every call, so a forged or stale role claim in this token can't grant anything the
     // server wouldn't already allow.
-    if (claims?.role !== 'admin') return <p className="p-2">You're not authorized to manage users.</p>
+    if (claims?.role !== 'admin') return <p>You're not authorized to manage users.</p>
 
     return <UserManagement jwt={getStoredJwt() ?? ''} />
 }
@@ -42,6 +65,7 @@ function UserManagement({ jwt }: { jwt: string }) {
     const [users, setUsers] = useState<AdminUser[] | null>(null)
     const [loadError, setLoadError] = useState<string | null>(null)
     const [invite, setInvite] = useState<InviteResult | null>(null)
+    const [pendingDelete, setPendingDelete] = useState<AdminUser | null>(null)
 
     const apiFetch = useCallback(
         (path: string, init: RequestInit = {}) => {
@@ -68,26 +92,19 @@ function UserManagement({ jwt }: { jwt: string }) {
         loadUsers()
     }, [loadUsers])
 
-    async function handleCreate(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault()
+    // Returns the error to show in the dialog, or null on success.
+    async function handleCreate(user: NewUser) {
         setLoadError(null)
-        // Captured before the first await: React nulls event.currentTarget once the handler yields,
-        // so reading it after the fetch threw and skipped the loadUsers() refresh below.
-        const formElement = event.currentTarget
-        const form = new FormData(formElement)
         const response = await apiFetch('/api/admin/users', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ name: form.get('name'), email: form.get('email'), role: form.get('role') })
+            body: JSON.stringify({ name: user.name, email: user.email, role: user.role })
         })
-        if (!response.ok) {
-            setLoadError(await response.text().then(text => text || 'Could not create user.'))
-            return
-        }
+        if (!response.ok) return await response.text().then(text => text || 'Could not create user.')
         const { inviteUrl, emailSent } = (await response.json()) as Omit<InviteResult, 'email'>
-        setInvite({ email: String(form.get('email')), inviteUrl, emailSent })
-        formElement.reset()
+        setInvite({ email: user.email, inviteUrl, emailSent })
         loadUsers()
+        return null
     }
 
     async function handleResendInvite(id: string, email: string) {
@@ -125,41 +142,75 @@ function UserManagement({ jwt }: { jwt: string }) {
         loadUsers()
     }
 
-    async function handleDelete(id: string) {
-        if (!window.confirm('Delete this user? This cannot be undone.')) return
+    async function handleDelete(user: AdminUser) {
+        setPendingDelete(null)
         setLoadError(null)
-        const response = await apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' })
-        if (!response.ok) {
-            setLoadError(await response.text().then(text => text || 'Could not delete user.'))
+        // A network failure throws instead of returning a response; toast it like any other failure.
+        const response = await apiFetch(`/api/admin/users/${user.id}`, { method: 'DELETE' }).catch(() => null)
+        if (!response?.ok) {
+            toast.error((await response?.text().catch(() => '')) || 'Could not delete user.')
             return
         }
+        toast.success(`Deleted ${user.email}.`)
         loadUsers()
     }
 
+    const columns: DataTableColumn<AdminUser>[] = [
+        { accessorKey: 'email', header: 'Email' },
+        {
+            accessorKey: 'role',
+            header: 'Role',
+            cell: ({ row: { original: row } }) => (
+                <Select value={row.role} onValueChange={role => role && handleRoleChange(row.id, role)}>
+                    <SelectTrigger size="sm" aria-label={`Role for ${row.email}`}>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {ROLES.map(role => (
+                            <SelectItem key={role} value={role}>
+                                {role}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            )
+        },
+        {
+            id: 'status',
+            header: 'Status',
+            cell: ({ row: { original: row } }) =>
+                row.banned ? `Banned${row.banReason ? ` (${row.banReason})` : ''}` : row.pending ? 'Invited' : 'Active'
+        },
+        {
+            id: 'actions',
+            cell: ({ row: { original: row } }) => (
+                <DropdownMenu>
+                    <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Actions for ${row.email}`} />}>
+                        <MoreHorizontal />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-auto">
+                        {row.pending && (
+                            <DropdownMenuItem onClick={() => handleResendInvite(row.id, row.email)}>Resend invite</DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => handleBanToggle(row.id, row.banned)}>
+                            {row.banned ? 'Unban' : 'Ban'}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem variant="destructive" onClick={() => setPendingDelete(row)}>
+                            Delete
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )
+        }
+    ]
+
     return (
-        <div className="p-2">
+        <div>
             <h3>Users</h3>
             {loadError && <p style={{ color: 'red' }}>{loadError}</p>}
 
-            <form onSubmit={handleCreate}>
-                <label>
-                    Name <input type="text" name="name" required />
-                </label>
-                <label>
-                    Email <input type="email" name="email" required />
-                </label>
-                <label>
-                    Role{' '}
-                    <select name="role" defaultValue="user">
-                        {ROLES.map(role => (
-                            <option key={role} value={role}>
-                                {role}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-                <button type="submit">Create user</button>
-            </form>
+            <CreateUserDialog onCreate={handleCreate} />
             {invite?.emailSent && <p>Invite sent to {invite.email}.</p>}
             {invite && !invite.emailSent && (
                 <p style={{ color: 'red' }}>
@@ -170,54 +221,24 @@ function UserManagement({ jwt }: { jwt: string }) {
 
             {users === null && <p>Loading users…</p>}
             {users !== null && users.length === 0 && <p>No users yet.</p>}
-            {users !== null && users.length > 0 && (
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {users.map(row => (
-                            <tr key={row.id}>
-                                <td>{row.email}</td>
-                                <td>
-                                    <select value={row.role} onChange={event => handleRoleChange(row.id, event.target.value)}>
-                                        {ROLES.map(role => (
-                                            <option key={role} value={role}>
-                                                {role}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </td>
-                                <td>
-                                    {row.banned
-                                        ? `Banned${row.banReason ? ` (${row.banReason})` : ''}`
-                                        : row.pending
-                                          ? 'Invited'
-                                          : 'Active'}
-                                </td>
-                                <td>
-                                    {row.pending && (
-                                        <button type="button" onClick={() => handleResendInvite(row.id, row.email)}>
-                                            Resend invite
-                                        </button>
-                                    )}
-                                    <button type="button" onClick={() => handleBanToggle(row.id, row.banned)}>
-                                        {row.banned ? 'Unban' : 'Ban'}
-                                    </button>
-                                    <button type="button" onClick={() => handleDelete(row.id)}>
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            )}
+            {users !== null && users.length > 0 && <DataTable columns={columns} data={users} getRowId={row => row.id} />}
+
+            <AlertDialog open={pendingDelete !== null} onOpenChange={open => !open && setPendingDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this user?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {pendingDelete?.email} will be permanently deleted. This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction variant="destructive" onClick={() => pendingDelete && handleDelete(pendingDelete)}>
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

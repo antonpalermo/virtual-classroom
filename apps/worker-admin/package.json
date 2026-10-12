@@ -16,10 +16,15 @@
     "dependencies": {
         "@capstone/auth-verify": "*",
         "@capstone/ui": "*",
+        "@tanstack/react-form": "^1.33.5",
         "@tanstack/react-router": "^1.170.31",
         "@tanstack/react-router-devtools": "^1.167.1",
+        "@tanstack/react-table": "^9.2.8",
+        "lucide-react": "^1.55.0",
         "react": "^19.2.8",
-        "react-dom": "^19.2.8"
+        "react-dom": "^19.2.8",
+        "sonner": "^2.0.8",
+        "zod": "^4.4.3"
     },
     "devDependencies": {
         "@capstone/typescript": "*",

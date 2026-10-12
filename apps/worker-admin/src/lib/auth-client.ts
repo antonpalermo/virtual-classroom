@@ -66,3 +66,10 @@ export async function redirectToSignIn() {
     })
     window.location.href = `${OIDC_ORIGIN}/api/auth/oauth2/authorize?${params.toString()}`
 }
+
+// Clears only the stored token — the worker-oidc session cookie survives, which is why
+// redirectToSignIn sends prompt=login.
+export function signOut() {
+    clearStoredJwt()
+    redirectToSignIn()
+}
