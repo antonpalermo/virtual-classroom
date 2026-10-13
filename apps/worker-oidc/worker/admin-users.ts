@@ -1,4 +1,3 @@
-import { createLocalAccountIssuer } from '@better-auth/core/db'
 import { verifyAccessTokenWithJwks } from '@capstone/auth-verify'
 import { generateRandomString } from 'better-auth/crypto'
 import { and, eq, isNull, ne, sql } from 'drizzle-orm'
@@ -264,7 +263,6 @@ export async function setUserPassword(db: Db, env: Env, userId: string, newPassw
         await authContext.internalAdapter.createAccount({
             userId,
             providerId: 'credential',
-            issuer: createLocalAccountIssuer('credential'),
             accountId: userId,
             password: hashedPassword
         })

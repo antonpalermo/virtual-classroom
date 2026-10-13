@@ -18,10 +18,10 @@
 
 ## Regenerating the schema after a config change
 
-`auth@latest` can resolve to a version bundling a newer, schema-incompatible `@better-auth/core` than this project's pinned `better-auth@^1.7.1` — this has silently dropped an existing column (`account.issuer` and its unique index) before, which `drizzle-kit generate` would then turn into a destructive migration. Pin the version to match, and review the generated diff (`git diff src/db/schema.ts`, expecting only additive changes) before running `drizzle-kit generate` on it.
+`auth@latest` can resolve to a version bundling a newer, schema-incompatible `@better-auth/core` than this project's pinned `better-auth@^1.7.7`. (Better Auth 1.7.0–1.7.2 added a required `account.issuer` column that 1.7.3 removed again — `drizzle/0003_*.sql` drops it; see https://www.better-auth.com/docs/guides/1-7-upgrade-guide.) Pin the version to match, and review the generated diff (`git diff src/db/schema.ts`, expecting only additive changes) before running `drizzle-kit generate` on it.
 
 ```bash
-npx auth@1.7.1 generate --config ./auth.cli.ts --adapter drizzle --dialect sqlite --output src/db/schema.ts -y
+npx auth@1.7.7 generate --config ./auth.cli.ts --adapter drizzle --dialect sqlite --output src/db/schema.ts -y
 npx drizzle-kit generate
 ```
 
