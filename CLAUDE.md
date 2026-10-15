@@ -6,11 +6,10 @@ Each workspace has its own `CLAUDE.md` with details specific to it — read that
 
 ## Project overview
 
-A virtual classroom / video conferencing app built entirely on Cloudflare Workers. It's an early-stage Turborepo monorepo (npm workspaces) with five deployable apps and four shared packages:
+A virtual classroom / video conferencing app built entirely on Cloudflare Workers. It's an early-stage Turborepo monorepo (npm workspaces) with four deployable apps and four shared packages:
 
 - `apps/worker-client` (`@capstone/client`) — the frontend. See [apps/worker-client/CLAUDE.md](apps/worker-client/CLAUDE.md).
 - `apps/worker-realtime` (`@capstone/realtime`) — the realtime signaling backend (`Messenger` Durable Object). See [apps/worker-realtime/CLAUDE.md](apps/worker-realtime/CLAUDE.md).
-- `apps/worker-auth` (`@capstone/auth`) — the identity worker: Google sign-in/sign-up and the OAuth provider other apps will link against. No app signs in through it anymore — `worker-client` and `worker-admin` both use `worker-oidc`. See [apps/worker-auth/CLAUDE.md](apps/worker-auth/CLAUDE.md).
 - `apps/worker-admin` (`@capstone/admin`) — the admin worker: a static SPA signing in against `worker-oidc` (user management deferred). See [apps/worker-admin/CLAUDE.md](apps/worker-admin/CLAUDE.md).
 - `apps/worker-oidc` (`@capstone/openid-connect`) — the identity worker: email/password + Google (D1 via Drizzle) plus Better Auth's `oauthProvider` plugin; the OIDC provider `worker-client` and `worker-admin` sign in against. See [apps/worker-oidc/CLAUDE.md](apps/worker-oidc/CLAUDE.md).
 - `packages/lib-web-standards` (`@capstone/standards`) — shareable, generated HTTP status code/phrase constants that standardize status handling across workers. See [packages/lib-web-standards/CLAUDE.md](packages/lib-web-standards/CLAUDE.md).
@@ -18,7 +17,7 @@ A virtual classroom / video conferencing app built entirely on Cloudflare Worker
 - `packages/lib-auth-verify` (`@capstone/auth-verify`) — verifies a worker-oidc-issued JWT against its JWKS endpoint; consumed by `worker-client` and `worker-admin`. See [packages/lib-auth-verify/CLAUDE.md](packages/lib-auth-verify/CLAUDE.md).
 - `packages/lib-ui` (`@capstone/ui`) — shared shadcn/ui components (Base UI) + Tailwind v4 theme (`globals.css`); consumed by `worker-client`, `worker-admin`, and `worker-oidc`. See [packages/lib-ui/CLAUDE.md](packages/lib-ui/CLAUDE.md).
 
-The five apps are independent Cloudflare Workers deployed separately. `worker-client` and `worker-admin` are static SPAs that each sign in against `worker-oidc` as their own public OAuth client (Authorization Code + PKCE, straight from the browser — no service bindings) — see [apps/worker-client/CLAUDE.md](apps/worker-client/CLAUDE.md), [apps/worker-admin/CLAUDE.md](apps/worker-admin/CLAUDE.md), and [apps/worker-oidc/CLAUDE.md](apps/worker-oidc/CLAUDE.md). `worker-realtime` has no service bindings yet.
+The four apps are independent Cloudflare Workers deployed separately. `worker-client` and `worker-admin` are static SPAs that each sign in against `worker-oidc` as their own public OAuth client (Authorization Code + PKCE, straight from the browser — no service bindings) — see [apps/worker-client/CLAUDE.md](apps/worker-client/CLAUDE.md), [apps/worker-admin/CLAUDE.md](apps/worker-admin/CLAUDE.md), and [apps/worker-oidc/CLAUDE.md](apps/worker-oidc/CLAUDE.md). `worker-realtime` has no service bindings yet.
 
 ## Generated files — never Read in full
 

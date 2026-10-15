@@ -12,7 +12,6 @@ A virtual classroom / video conferencing app built entirely on Cloudflare Worker
 | `apps/worker-admin`    | `@capstone/admin`            | `admin.klassroom.online`     | `8790`     | Admin SPA: user management dashboard. Signs in against `worker-oidc`.                       |
 | `apps/worker-oidc`     | `@capstone/openid-connect`   | `auth.klassroom.online`      | `8791`     | Identity provider: email/password + Google (D1 via Drizzle) and Better Auth's OIDC provider. |
 | `apps/worker-realtime` | `@capstone/realtime`         | —                           | `8788`     | Realtime signaling (`Messenger` Durable Object).                                            |
-| `apps/worker-auth`     | `@capstone/auth`             | —                           | `8789`     | Legacy identity worker (Google sign-in). No app signs in through it anymore.                |
 
 `worker-client` and `worker-admin` are static SPAs; each signs in against `worker-oidc` as its own public OAuth client (Authorization Code + PKCE, straight from the browser, no service bindings).
 
@@ -164,11 +163,10 @@ cd apps/worker-client && npm run deploy   # build + wrangler deploy (static asse
 cd apps/worker-admin  && npm run deploy
 ```
 
-### 3. `worker-realtime` / `worker-auth`
+### 3. `worker-realtime`
 
 ```sh
 cd apps/worker-realtime && npm run deploy
-cd apps/worker-auth     && npm run deploy   # legacy; only if you still need it
 ```
 
 ### Checklist
