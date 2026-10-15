@@ -1,5 +1,13 @@
 # @capstone/openid-connect
 
+## 0.5.2
+
+### Patch Changes
+
+- 53243dc: Upgrade Better Auth to 1.7.7 and drop the `account.issuer` column it no longer writes (migration `0005`); switch tests to `@cloudflare/vitest-plugin`.
+- Updated dependencies [287def5]
+    - @capstone/ui@0.2.0
+
 ## 0.5.1
 
 ### Patch Changes
