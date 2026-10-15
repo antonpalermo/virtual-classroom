@@ -89,9 +89,8 @@ export function createAuth(db: Db, env: Env) {
                 disableSignUp: true
             }
         },
-        // 'https://example.com' matches the origin the test suite's synthetic requests use,
-        // same as worker-auth's own trustedOrigins (see apps/worker-auth/src/auth.ts) — without
-        // it, better-auth's originCheckMiddleware rejects the /oauth2/consent POST (which sends
+        // 'https://example.com' matches the origin the test suite's synthetic requests use —
+        // without it, better-auth's originCheckMiddleware rejects the /oauth2/consent POST (which sends
         // an Origin header alongside the session cookie) with a 403 "Invalid origin" before the
         // request ever reaches the oauth-provider plugin's own consent handler.
         // env.BETTER_AUTH_URL is listed here defensively/redundantly — better-auth's own

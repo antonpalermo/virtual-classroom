@@ -14,8 +14,7 @@ function base64url(bytes: ArrayBuffer) {
         .replace(/=+$/, '')
 }
 
-// Same helper apps/worker-auth/test/oauth-provider.test.ts uses — registered clients default to
-// require_pkce: true, so a real authorization-code flow needs a real PKCE pair.
+// Registered clients default to require_pkce: true, so a real authorization-code flow needs a real PKCE pair.
 async function generatePkcePair() {
     const codeVerifier = base64url(crypto.getRandomValues(new Uint8Array(32)).buffer)
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier))

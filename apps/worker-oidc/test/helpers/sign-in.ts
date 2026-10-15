@@ -11,7 +11,7 @@ import { callAsApp } from './call-app.js'
 // doesn't collide with tests that specifically need a plain, non-admin user's token.
 const REDIRECT_URI = 'https://client.example.test/auth-callback'
 
-// Same helper apps/worker-auth/test/oauth-provider.test.ts and oauth-client-flow.test.ts use —
+// Same helper oauth-client-flow.test.ts uses —
 // registered clients default to require_pkce: true, so a real authorization-code flow needs a
 // real PKCE pair.
 function base64url(bytes: ArrayBuffer) {
