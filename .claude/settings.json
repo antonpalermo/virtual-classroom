@@ -58,6 +58,7 @@
     },
     "enabledPlugins": {
         "superpowers@claude-plugins-official": true,
-        "ponytail@ponytail": true
+        "ponytail@ponytail": true,
+        "claude-mem-cowork@thedotmack": true
     }
 }
